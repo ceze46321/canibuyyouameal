@@ -1,0 +1,13 @@
+{
+  "name": "Flutter Dev",
+  "image": "mcr.microsoft.com/vscode/devcontainers/base:ubuntu",
+  "postCreateCommand": "sudo apt update && sudo apt install -y git curl unzip && git clone https://github.com/flutter/flutter.git -b stable --depth 1 && /home/vscode/flutter/bin/flutter doctor",
+  "customizations": {
+    "vscode": {
+      "extensions": ["Dart-Code.flutter", "Dart-Code.dart-code"]
+    }
+  },
+  "portsAttributes": {
+    "8080": { "label": "Flutter Web", "onAutoForward": "openPreview" }
+  }
+}
