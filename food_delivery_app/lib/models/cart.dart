@@ -13,7 +13,7 @@ class CartItem {
 }
 
 class Cart with ChangeNotifier {
-  List<CartItem> _items = [];
+  final List<CartItem> _items = [];
   List<CartItem> get items => _items;
 
   void addItem(String name, double price, String restaurantName) {

@@ -18,6 +18,8 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -36,6 +38,8 @@ class MyApp extends StatelessWidget {
 }
 
 class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
   @override
   _HomeScreenState createState() => _HomeScreenState();
 }
@@ -119,6 +123,8 @@ class RestaurantScreen extends StatelessWidget {
     [Colors.green.shade300, Colors.green.shade700],
     [Colors.red.shade300, Colors.red.shade700],
   ];
+
+  const RestaurantScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -205,7 +211,7 @@ class RestaurantScreen extends StatelessWidget {
 
 class MenuScreen extends StatelessWidget {
   final Map<String, dynamic> restaurant;
-  MenuScreen({required this.restaurant});
+  const MenuScreen({super.key, required this.restaurant});
 
   @override
   Widget build(BuildContext context) {
@@ -288,7 +294,6 @@ class MenuScreen extends StatelessWidget {
                         SnackBar(content: Text('$item added to cart')),
                       );
                     },
-                    child: Text('Add'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.teal,
                       foregroundColor: Colors.white,
@@ -296,6 +301,7 @@ class MenuScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
+                    child: Text('Add'),
                   ),
                 ],
               ),
@@ -307,6 +313,8 @@ class MenuScreen extends StatelessWidget {
   }
 }
 class CartScreen extends StatelessWidget {
+  const CartScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -404,11 +412,11 @@ class CartScreen extends StatelessWidget {
                         context,
                         MaterialPageRoute(builder: (_) => PaymentScreen()),
                       ),
-                      child: Text('Checkout'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.teal,
                         foregroundColor: Colors.white,
                       ),
+                      child: Text('Checkout'),
                     ),
                   ],
                 ),
@@ -422,6 +430,8 @@ class CartScreen extends StatelessWidget {
 }
 
 class PaymentScreen extends StatelessWidget {
+  const PaymentScreen({super.key});
+
   @override
   Widget build(BuildContext context) {
     final cart = Provider.of<Cart>(context);
@@ -456,12 +466,12 @@ class PaymentScreen extends StatelessWidget {
                 );
                 Navigator.popUntil(context, (route) => route.isFirst);
               },
-              child: Text('Pay Now'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.teal,
                 foregroundColor: Colors.white,
                 padding: EdgeInsets.symmetric(horizontal: 40, vertical: 16),
               ),
+              child: Text('Pay Now'),
             ),
           ],
         ),
@@ -477,6 +487,8 @@ class GroceryScreen extends StatelessWidget {
     [Colors.cyan.shade300, Colors.cyan.shade700],
     [Colors.amber.shade300, Colors.amber.shade700],
   ];
+
+  const GroceryScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -545,7 +557,6 @@ class GroceryScreen extends StatelessWidget {
                                 SnackBar(content: Text('${grocery['name']} added to cart')),
                               );
                             },
-                            child: Text('Add'),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.teal,
                               foregroundColor: Colors.white,
@@ -553,6 +564,7 @@ class GroceryScreen extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                             ),
+                            child: Text('Add'),
                           ),
                         ],
                       ),
@@ -579,6 +591,8 @@ class DiscoverScreen extends StatelessWidget {
     [Colors.red.shade300, Colors.red.shade700],
     [Colors.teal.shade300, Colors.teal.shade700],
   ];
+
+  const DiscoverScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -665,11 +679,15 @@ class DiscoverScreen extends StatelessWidget {
   }
 }
 class OrderScreen extends StatelessWidget {
+  const OrderScreen({super.key});
+
   @override
   Widget build(BuildContext context) => Center(child: Text('Orders'));
 }
 
 class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+
   @override
   Widget build(BuildContext context) => Center(child: Text('Profile'));
 }
