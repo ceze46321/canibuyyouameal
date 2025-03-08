@@ -24,7 +24,10 @@ dependencies:
   # New dependencies for enhanced UI and interactions
   flutter_slidable: ^3.0.0              # For swipeable actions in CartScreen
   getwidget: ^6.0.0                     # For polished cards and buttons (updated to latest)
-  google_fonts: ^6.1.0                  # For custom typography (Poppins)
+  google_fonts: ^6.1.0  
+  flutter_local_notifications: ^18.0.0        
+  glass_kit: ^4.0.1        # Glassmorphism
+  animate_do: ^3.3.4        # For custom typography (Poppins)
 
 dev_dependencies:
   flutter_test:
