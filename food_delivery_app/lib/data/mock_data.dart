@@ -1,4 +1,4 @@
-// Restaurants (unchanged, keeping 10 as per last update)
+// Restaurants (10 entries, added isFavorite and deliveryTime)
 List<Map<String, dynamic>> mockRestaurants = [
   {
     'id': 1,
@@ -8,6 +8,8 @@ List<Map<String, dynamic>> mockRestaurants = [
       'Burger': {'price': 10, 'image': 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
       'Fries': {'price': 3, 'image': 'https://images.unsplash.com/photo-1572802419224-296b0aeee0d9?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
     },
+    'isFavorite': true,
+    'deliveryTime': '20-30 min', // Added for delivery estimate
   },
   {
     'id': 2,
@@ -17,6 +19,8 @@ List<Map<String, dynamic>> mockRestaurants = [
       'Pizza': {'price': 12, 'image': 'https://images.unsplash.com/photo-1571066815191-6b4e8d2365f0?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
       'Soda': {'price': 2, 'image': 'https://images.unsplash.com/photo-1624516854318-3e9e8b8e6b3b?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
     },
+    'isFavorite': false,
+    'deliveryTime': '25-35 min',
   },
   {
     'id': 3,
@@ -24,8 +28,10 @@ List<Map<String, dynamic>> mockRestaurants = [
     'image': 'https://images.unsplash.com/photo-1579584425555-849d2b5d1c27?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60',
     'menu': {
       'Sushi Roll': {'price': 15, 'image': 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
-      'Miso Soup': {'price': 4, 'image': 'https://images.unsplash.com/photo-1617096700797-fd365e8b2e8a?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
+      'Miso Soup': {'price': 4, 'image': 'https://images.unsplash.com/photo-1617096700797-73dfa7b1fd56?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
     },
+    'isFavorite': true,
+    'deliveryTime': '30-40 min',
   },
   {
     'id': 4,
@@ -35,6 +41,8 @@ List<Map<String, dynamic>> mockRestaurants = [
       'Chicken Curry': {'price': 11, 'image': 'https://images.unsplash.com/photo-1604901383290-91e6b6d3d1a5?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
       'Naan': {'price': 3, 'image': 'https://images.unsplash.com/photo-1619537580898-0a03c0860e59?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
     },
+    'isFavorite': false,
+    'deliveryTime': '15-25 min',
   },
   {
     'id': 5,
@@ -44,6 +52,8 @@ List<Map<String, dynamic>> mockRestaurants = [
       'Taco': {'price': 8, 'image': 'https://images.unsplash.com/photo-1551504734-83ee43e53514?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
       'Guacamole': {'price': 5, 'image': 'https://images.unsplash.com/photo-1603046899560-0bf2e4d6e06e?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
     },
+    'isFavorite': true,
+    'deliveryTime': '20-30 min',
   },
   {
     'id': 6,
@@ -53,6 +63,8 @@ List<Map<String, dynamic>> mockRestaurants = [
       'Spaghetti': {'price': 13, 'image': 'https://images.unsplash.com/photo-1608890270668-39fc4e359d34?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
       'Garlic Bread': {'price': 4, 'image': 'https://images.unsplash.com/photo-1598379230548-5f7fb47fe63b?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
     },
+    'isFavorite': false,
+    'deliveryTime': '25-35 min',
   },
   {
     'id': 7,
@@ -62,6 +74,8 @@ List<Map<String, dynamic>> mockRestaurants = [
       'Ribs': {'price': 18, 'image': 'https://images.unsplash.com/photo-1592853621830-1b3177c6185f?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
       'Coleslaw': {'price': 3, 'image': 'https://images.unsplash.com/photo-1622643049740-4f58e4e531d8?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
     },
+    'isFavorite': false,
+    'deliveryTime': '35-45 min',
   },
   {
     'id': 8,
@@ -71,6 +85,8 @@ List<Map<String, dynamic>> mockRestaurants = [
       'Salad': {'price': 9, 'image': 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
       'Smoothie': {'price': 6, 'image': 'https://images.unsplash.com/photo-1505252585461-04db1eb84625?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
     },
+    'isFavorite': true,
+    'deliveryTime': '15-25 min',
   },
   {
     'id': 9,
@@ -80,6 +96,8 @@ List<Map<String, dynamic>> mockRestaurants = [
       'Dumplings': {'price': 10, 'image': 'https://images.unsplash.com/photo-1601333093326-42ca3e5a1495?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
       'Tea': {'price': 2, 'image': 'https://images.unsplash.com/photo-1578985545068-5849370a8e74?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
     },
+    'isFavorite': false,
+    'deliveryTime': '20-30 min',
   },
   {
     'id': 10,
@@ -89,49 +107,61 @@ List<Map<String, dynamic>> mockRestaurants = [
       'Cake': {'price': 7, 'image': 'https://images.unsplash.com/photo-1578985545068-5849370a8e74?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
       'Ice Cream': {'price': 5, 'image': 'https://images.unsplash.com/photo-1497034825429-c343d7c6a68f?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60'},
     },
+    'isFavorite': true,
+    'deliveryTime': '10-20 min',
   },
 ];
 
-// Grocery Items
+// Grocery Items (5 entries, added isFavorite and deliveryTime)
 List<Map<String, dynamic>> mockGroceries = [
   {
     'id': 1,
     'name': 'Fresh Apples',
     'price': 2.5,
     'image': 'https://images.unsplash.com/photo-1567306226416-28f0ef73a540?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60',
+    'isFavorite': true,
+    'deliveryTime': '15-25 min', // Added for delivery estimate
   },
   {
     'id': 2,
     'name': 'Organic Milk',
     'price': 3.0,
     'image': 'https://images.unsplash.com/photo-1603533792099-32d5c58f55fe?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60',
+    'isFavorite': false,
+    'deliveryTime': '20-30 min',
   },
   {
     'id': 3,
     'name': 'Whole Bread',
     'price': 2.0,
     'image': 'https://images.unsplash.com/photo-1598373182133-5243682d7014?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60',
+    'isFavorite': true,
+    'deliveryTime': '15-25 min',
   },
   {
     'id': 4,
     'name': 'Eggs (Dozen)',
     'price': 4.0,
     'image': 'https://images.unsplash.com/photo-1584269602048-0e2f4c98e444?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60',
+    'isFavorite': false,
+    'deliveryTime': '20-30 min',
   },
   {
     'id': 5,
     'name': 'Avocado',
     'price': 1.5,
     'image': 'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60',
+    'isFavorite': true,
+    'deliveryTime': '10-20 min',
   },
 ];
 
-// Discover Items (Featured Deals or Recommendations)
+// Discover Items (3 entries, unchanged but verified for Community Favorite)
 List<Map<String, dynamic>> mockDiscover = [
   {
     'id': 1,
     'title': 'Pizza Party Deal',
-    'description': '2 Pizzas + Soda for \$20', // Fixed with escape character
+    'description': '2 Pizzas + Soda for \$20',
     'image': 'https://images.unsplash.com/photo-1595854341625-fc9e6a9a7d2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=500&q=60',
   },
   {
