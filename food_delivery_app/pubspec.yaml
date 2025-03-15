@@ -1,36 +1,25 @@
-name: food_delivery_app
-description: "A new Flutter project."
+name: chiw_express
+description: A food delivery app
 publish_to: 'none'
-
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.7.0
+  sdk: '>=3.0.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
-  cupertino_icons: ^1.0.8
-  provider: ^6.1.2
-  flutter_staggered_grid_view: ^0.7.0
-  flutter_slidable: ^3.0.1
-  google_fonts: ^6.2.1
-  table_calendar: ^3.0.9
-  flutter_svg: ^2.0.10+1  # Kept for potential future use, but not needed now
-  flutter_animate: ^4.5.0
-  animate_do: ^3.3.4
-  flutter_spinkit: ^5.2.1
-  flutter_local_notifications: ^18.0.0
-  http: ^1.2.0
-  uuid: ^4.0.0
-  arcore_flutter_plugin: ^0.1.0
-  arkit_plugin: ^1.0.5
-  speech_to_text: ^6.6.1
+  provider: ^6.0.0
+  http: ^1.0.0
+  google_fonts: ^6.0.0
+  flutter_spinkit: ^5.1.0
+  geocoding: ^3.0.0
+  flutter_stripe: ^11.0.0
+  google_sign_in: ^6.2.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
 
 flutter:
   uses-material-design: true
