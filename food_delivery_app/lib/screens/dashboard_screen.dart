@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../main.dart';
+import '../auth_provider.dart'; // Adjusted to match typical structure
+import '../main.dart' show primaryColor, textColor, accentColor;
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -14,6 +15,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   bool _isLoading = false;
+  int _selectedIndex = 3; // Default to Profile tab (index 3), adjust if needed
 
   @override
   void initState() {
@@ -24,6 +26,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _updateProfile() async {
+    if (_nameController.text.isEmpty || _emailController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Name and email are required'), backgroundColor: Colors.red),
+      );
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       await Provider.of<AuthProvider>(context, listen: false).updateProfile(
@@ -61,6 +69,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+    switch (index) {
+      case 0:
+        Navigator.pushReplacementNamed(context, '/home');
+        break;
+      case 1:
+        Navigator.pushReplacementNamed(context, '/restaurants');
+        break;
+      case 2:
+        Navigator.pushReplacementNamed(context, '/orders');
+        break;
+      case 3:
+        Navigator.pushReplacementNamed(context, '/profile');
+        break;
+      case 4:
+        Navigator.pushReplacementNamed(context, '/restaurant-owner');
+        break;
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
@@ -88,9 +126,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               controller: _nameController,
               decoration: InputDecoration(
                 labelText: 'Name',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Colors.white,
+                labelStyle: GoogleFonts.poppins(color: textColor.withOpacity(0.7)),
               ),
             ),
             const SizedBox(height: 16),
@@ -98,9 +134,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               controller: _emailController,
               decoration: InputDecoration(
                 labelText: 'Email',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                filled: true,
-                fillColor: Colors.white,
+                labelStyle: GoogleFonts.poppins(color: textColor.withOpacity(0.7)),
               ),
             ),
             const SizedBox(height: 32),
@@ -128,6 +162,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   ),
           ],
         ),
+      ),
+      bottomNavigationBar: BottomNavigationBar(
+        items: const <BottomNavigationBarItem>[
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.restaurant),
+            label: 'Restaurants',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.shopping_cart),
+            label: 'Orders',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.store),
+            label: 'Owner',
+          ),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: primaryColor,
+        unselectedItemColor: textColor.withOpacity(0.6),
+        onTap: _onItemTapped,
+        type: BottomNavigationBarType.fixed,
       ),
     );
   }

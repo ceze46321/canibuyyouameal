@@ -1,31 +1,23 @@
-import 'package:flutter/material.dart';
-
 class CartItem {
+  final String id;
   final String name;
   final double price;
-  final String restaurantName;
+  int quantity;
+  final String? restaurantName; // Nullable, matches backend flexibility
 
   CartItem({
+    required this.id,
     required this.name,
     required this.price,
-    required this.restaurantName,
+    this.quantity = 1,
+    this.restaurantName,
   });
-}
 
-class Cart with ChangeNotifier {
-  final List<CartItem> _items = [];
-
-  List<CartItem> get items => _items;
-
-  double get total => _items.fold(0, (sum, item) => sum + item.price);
-
-  void addItem(String name, double price, String restaurantName) {
-    _items.add(CartItem(name: name, price: price, restaurantName: restaurantName));
-    notifyListeners();
-  }
-
-  void clear() {
-    _items.clear();
-    notifyListeners();
-  }
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'price': price,
+        'quantity': quantity,
+        'restaurant_name': restaurantName, // Matches Laravel validation (items.*.restaurant_name)
+      };
 }
