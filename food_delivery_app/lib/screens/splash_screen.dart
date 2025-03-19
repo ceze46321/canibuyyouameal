@@ -1,36 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-import '../main.dart';
+import '../main.dart' show primaryColor, textColor; // Add textColor to import
 
-class SplashScreen extends StatefulWidget {
+class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
   @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    Future.delayed(const Duration(seconds: 2), () {
-      final auth = Provider.of<AuthProvider>(context, listen: false);
-      Navigator.pushReplacementNamed(context, auth.isLoggedIn ? '/home' : '/');
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
+    Future.delayed(const Duration(seconds: 2), () {
+      Navigator.pushReplacementNamed(context, '/login');
+    });
+
     return Scaffold(
-      backgroundColor: primaryColor,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.restaurant_menu, size: 100, color: Colors.white),
-            const SizedBox(height: 16),
-            Text('Chow Express', style: GoogleFonts.poppins(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold)),
+            const Icon(Icons.fastfood, size: 100, color: primaryColor),
+            Text(
+              'Chiw Express',
+              style: GoogleFonts.poppins(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                color: textColor, // Now correctly imported
+              ),
+            ),
+            const SizedBox(height: 20),
+            const CircularProgressIndicator(),
           ],
         ),
       ),

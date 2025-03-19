@@ -1,229 +1,194 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'services/api_service.dart';
+import 'package:uni_links/uni_links.dart'; // Add this for deep linking
+import 'dart:async';
+import 'auth_provider.dart'; // Keep this in lib/ if it’s there
+import 'screens/checkout_screen.dart'; // Adjusted to lib/screens/
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/signup_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/add_restaurant_screen.dart';
 import 'screens/restaurant_screen.dart';
 import 'screens/restaurant_profile_screen.dart';
+import 'screens/restaurant_owner_screen.dart';
 import 'screens/order_screen.dart';
-import 'screens/checkout_screen.dart';
-import 'screens/grocery_screen.dart';
+import 'screens/profile_screen.dart';
 import 'screens/dashboard_screen.dart';
-import 'screens/home_screen.dart';
 import 'screens/logistics_screen.dart';
-import 'screens/dasher_screen.dart'; // Re-added
-import 'screens/restaurant_owner_screen.dart'; // Re-added
-import 'screens/profile_screen.dart'; // New ProfileScreen
+import 'screens/cart_screen.dart';
+import 'screens/grocery_screen.dart';
 
-const primaryColor = Color(0xFFE63946);
-const accentColor = Color(0xFF4CAF50);
-const secondaryColor = Color(0xFFFF9800);
-const backgroundColor = Color(0xFFFFF8E1);
-const textColor = Color(0xFF212121);
+const primaryColor = Color(0xFFFF7043); // Warm Coral (Appetizing & Playful)
+const textColor = Color(0xFF3E2723); // Deep Brown (Rich & Readable)
+const accentColor = Color(0xFF66BB6A); // Fresh Green (Healthy & Organic)
+const secondaryColor = Color(0xFFFFCA28); // Soft Gold (Friendly & Energetic)
 
-void main() {
+Future<void> main() async {
+  try {
+    await dotenv.load(fileName: ".env");
+    print('Dotenv loaded successfully');
+  } catch (e) {
+    print('Error loading .env: $e');
+  }
   runApp(
-    MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (_) => AuthProvider(ApiService())),
-      ],
+    ChangeNotifierProvider(
+      create: (_) {
+        print('Creating AuthProvider');
+        final authProvider = AuthProvider();
+        authProvider.loadToken(); // Load token on startup
+        return authProvider;
+      },
       child: const MyApp(),
     ),
   );
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Chiw Express',
-      theme: ThemeData(
-        primaryColor: primaryColor,
-        scaffoldBackgroundColor: backgroundColor,
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: primaryColor,
-            foregroundColor: Colors.white,
-            textStyle: GoogleFonts.poppins(),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-        ),
-        textTheme: GoogleFonts.poppinsTextTheme().apply(bodyColor: textColor),
-      ),
-      initialRoute: '/splash',
-      routes: {
-        '/splash': (context) => const SplashScreen(),
-        '/': (context) => const LoginScreen(),
-        '/signup': (context) => const SignUpScreen(),
-        '/home': (context) => const MainScreen(initialIndex: 0),
-        '/restaurants': (context) => const MainScreen(initialIndex: 1),
-        '/orders': (context) => const MainScreen(initialIndex: 2),
-        '/logistics': (context) => const MainScreen(initialIndex: 3),
-        '/groceries': (context) => const MainScreen(initialIndex: 4),
-        '/dashers': (context) => const MainScreen(initialIndex: 5), // New route
-        '/restaurant-owners': (context) => const MainScreen(initialIndex: 6), // New route
-        '/dashboard': (context) => const DashboardScreen(),
-        '/profile': (context) => const ProfileScreen(), // New profile route
-      },
-    );
-  }
+  State<MyApp> createState() => _MyAppState();
 }
 
-class AuthProvider with ChangeNotifier {
-  final ApiService _apiService;
-  String? _userId;
-  String? _name;
-  String? _email;
-  String? _token;
-  String? _role; // Added role
-
-  AuthProvider(this._apiService);
-
-  bool get isLoggedIn => _token != null;
-  String? get userId => _userId;
-  String? get name => _name;
-  String? get email => _email;
-  String? get role => _role; // Getter for role
-
-  Future<void> register(String name, String email, String password, String role, {required BuildContext context}) async {
-    final data = await _apiService.register(name, email, password, role);
-    _userId = data['user']['id'].toString();
-    _name = data['user']['name'];
-    _email = data['user']['email'];
-    _token = data['token'];
-    _role = data['user']['role']; // Store role from registration
-    _apiService.setToken(_token!);
-    Navigator.pushReplacementNamed(context, '/home');
-    notifyListeners();
-  }
-
-  Future<Map<String, dynamic>> login(String email, String password) async {
-    final data = await _apiService.login(email, password);
-    _userId = data['user']['id'].toString();
-    _name = data['user']['name'];
-    _email = data['user']['email'];
-    _token = data['token'];
-    _role = data['user']['role']; // Store role from login
-    _apiService.setToken(_token!);
-    notifyListeners();
-    return data; // Return data for LoginScreen to use
-  }
-
-  Future<Map<String, dynamic>> loginWithGoogle(String email, String accessToken) async {
-    // Simulate Google login by using regular login with a placeholder password
-    // Replace this with a dedicated /api/google-login endpoint later
-    final data = await _apiService.login(email, 'google-auth-placeholder-$accessToken');
-    _userId = data['user']['id'].toString();
-    _name = data['user']['name'];
-    _email = data['user']['email'];
-    _token = data['token'];
-    _role = data['user']['role'] ?? 'customer'; // Default to customer if not provided
-    _apiService.setToken(_token!);
-    notifyListeners();
-    return data;
-  }
-
-  Future<void> logout() async {
-    await _apiService.logout();
-    _userId = null;
-    _name = null;
-    _email = null;
-    _token = null;
-    _role = null; // Clear role on logout
-    notifyListeners();
-  }
-
-  Future<Map<String, dynamic>> getProfile() async => await _apiService.getProfile();
-
-  Future<void> updateProfile(String name, String email, {Map<String, dynamic>? restaurantDetails}) async {
-    await _apiService.updateProfile(name, email, restaurantDetails: restaurantDetails);
-    _name = name;
-    _email = email;
-    notifyListeners();
-  }
-
-  // New method to upgrade role
-  Future<void> upgradeRole(String newRole) async {
-    final data = await _apiService.upgradeRole(newRole);
-    _role = data['user']['role'];
-    notifyListeners();
-  }
-}
-
-class MainScreen extends StatefulWidget {
-  final int initialIndex;
-  const MainScreen({super.key, required this.initialIndex});
-
-  @override
-  State<MainScreen> createState() => _MainScreenState();
-}
-
-class _MainScreenState extends State<MainScreen> {
-  late int _currentIndex;
+class _MyAppState extends State<MyApp> {
+  StreamSubscription? _sub;
 
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex;
+    initUniLinks();
   }
 
-  List<Widget> _getScreens(String? role) {
-    // Base screens available to all roles
-    List<Widget> screens = [
-      const HomeScreen(),
-      const RestaurantScreen(),
-      const OrderScreen(),
-      const LogisticsScreen(),
-      const GroceryScreen(),
-      const DasherScreen(), // Added empty screen
-      const RestaurantOwnerScreen(), // Added empty screen
-    ];
-
-    // Add ProfileScreen for all logged-in users
-    screens.add(const ProfileScreen());
-
-    return screens;
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
   }
 
-  List<BottomNavigationBarItem> _getNavItems(String? role) {
-    // Base items available to all roles
-    List<BottomNavigationBarItem> items = [
-      const BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-      const BottomNavigationBarItem(icon: Icon(Icons.restaurant), label: 'Restaurants'),
-      const BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'Orders'),
-      const BottomNavigationBarItem(icon: Icon(Icons.local_shipping), label: 'Logistics'),
-      const BottomNavigationBarItem(icon: Icon(Icons.shopping_basket), label: 'Groceries'),
-      const BottomNavigationBarItem(icon: Icon(Icons.directions_bike), label: 'Dashers'),
-      const BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Restaurants'), // Merchant-specific
-    ];
+  Future<void> initUniLinks() async {
+    try {
+      // Handle initial deep link when app starts
+      final initialLink = await getInitialLink();
+      if (initialLink != null) {
+        _handleDeepLink(initialLink);
+      }
 
-    // Add Profile tab for all logged-in users
-    items.add(const BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'));
+      // Listen for deep links while app is running
+      _sub = linkStream.listen((String? link) {
+        if (link != null) {
+          _handleDeepLink(link);
+        }
+      }, onError: (err) {
+        print('Deep link error: $err');
+      });
+    } catch (e) {
+      print('Error initializing deep links: $e');
+    }
+  }
 
-    return items;
+  void _handleDeepLink(String link) {
+    final uri = Uri.parse(link);
+    if (uri.scheme == 'chiwexpress' && uri.host == 'orders') {
+      final orderId = uri.queryParameters['order_id'];
+      final status = uri.queryParameters['status'];
+      print('Handling deep link: $link, orderId: $orderId, status: $status');
+
+      // Navigate to Orders screen with orderId and status
+      Navigator.pushReplacementNamed(
+        context,
+        '/orders',
+        arguments: {'orderId': orderId, 'status': status},
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    final screens = _getScreens(authProvider.role);
-    final navItems = _getNavItems(authProvider.role);
-
-    return Scaffold(
-      body: screens[_currentIndex],
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
-        selectedItemColor: primaryColor,
-        unselectedItemColor: textColor.withOpacity(0.6),
-        backgroundColor: Colors.white,
-        type: BottomNavigationBarType.fixed, // Use fixed type for more than 4 items
-        items: navItems,
+    print('Building MyApp');
+    return MaterialApp(
+      title: 'Chiw Express',
+      theme: ThemeData(
+        primaryColor: primaryColor,
+        scaffoldBackgroundColor: Colors.grey[100],
+        colorScheme: ColorScheme.fromSwatch(
+          primarySwatch: Colors.blue,
+          accentColor: accentColor,
+        ).copyWith(secondary: secondaryColor),
+        textTheme: const TextTheme(
+          bodyMedium: TextStyle(color: textColor, fontFamily: 'Poppins'),
+          titleLarge: TextStyle(color: textColor, fontFamily: 'Poppins', fontWeight: FontWeight.bold),
+          headlineSmall: TextStyle(color: textColor, fontSize: 24, fontWeight: FontWeight.bold),
+          labelLarge: TextStyle(color: Colors.white, fontSize: 16),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: primaryColor,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            textStyle: const TextStyle(fontFamily: 'Poppins'),
+          ),
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: primaryColor,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          titleTextStyle: TextStyle(fontFamily: 'Poppins', fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: primaryColor),
+          ),
+          filled: true,
+          fillColor: Colors.white,
+        ),
       ),
+      initialRoute: '/',
+      routes: {
+        '/': (context) {
+          print('Navigating to SplashScreen');
+          return const SplashScreen();
+        },
+        '/login': (context) {
+          print('Navigating to LoginScreen');
+          return const LoginScreen();
+        },
+        '/signup': (context) => const SignUpScreen(),
+        '/home': (context) => const HomeScreen(),
+        '/add-restaurant': (context) => const AddRestaurantScreen(),
+        '/dashboard': (context) => const DashboardScreen(),
+        '/profile': (context) => const ProfileScreen(),
+        '/orders': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final orderId = args?['orderId'] as String?;
+          final status = args?['status'] as String?;
+          print('Navigating to OrderScreen with orderId: $orderId, status: $status');
+          return OrderScreen(orderId: orderId, initialStatus: status);
+        },
+        '/dashers': (context) => const Scaffold(body: Center(child: Text('Dashers'))),
+        '/logistics': (context) => const LogisticsScreen(),
+        '/groceries': (context) => const GroceryScreen(),
+        '/restaurants': (context) => const RestaurantScreen(),
+        '/restaurant-profile': (context) => const RestaurantProfileScreen(
+              restaurant: {
+                'image': 'https://via.placeholder.com/300',
+                'tags': {'name': 'Test Restaurant', 'address': '123 Test St'},
+                'lat': 6.5,
+                'lon': 3.3,
+              },
+            ),
+        '/restaurant-owner': (context) => const RestaurantOwnerScreen(),
+        '/cart': (context) => const CartScreen(),
+        '/checkout': (context) => const CheckoutScreen(), // No cart parameter
+      },
+      onUnknownRoute: (settings) {
+        print('Unknown route: ${settings.name}');
+        return MaterialPageRoute(builder: (_) => const Scaffold(body: Center(child: Text('Route not found'))));
+      },
     );
   }
 }

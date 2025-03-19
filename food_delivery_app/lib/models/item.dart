@@ -137,8 +137,9 @@ class OrderProvider with ChangeNotifier {
 
   void updateOrderStatuses() {
     for (var order in _orders) {
-      if (order.status == 'Placed') order.status = 'Preparing';
-      else if (order.status == 'Preparing') order.status = 'Out for Delivery';
+      if (order.status == 'Placed') {
+        order.status = 'Preparing';
+      } else if (order.status == 'Preparing') order.status = 'Out for Delivery';
       else if (order.status == 'Out for Delivery') order.status = 'Delivered';
     }
     notifyListeners();
@@ -149,11 +150,11 @@ class GroupItem extends Item {
   final String addedBy;
 
   GroupItem({
-    required String name,
-    required double price,
-    required String restaurantName,
+    required super.name,
+    required super.price,
+    required super.restaurantName,
     required this.addedBy,
-  }) : super(name: name, price: price, restaurantName: restaurantName);
+  });
 }
 
 class GroupCart with ChangeNotifier {
