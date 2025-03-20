@@ -1,7 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../main.dart' show primaryColor, textColor, accentColor;
-import 'restaurant_screen.dart'; // Import RestaurantScreen for navigation
+import '../services/api_service.dart'; // Import ApiService
+import 'restaurant_screen.dart';
 
 class GroceryScreen extends StatefulWidget {
   const GroceryScreen({super.key});
@@ -12,8 +15,14 @@ class GroceryScreen extends StatefulWidget {
 
 class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
-  late Animation<double> _fadeAnimation;
-  int _selectedIndex = 2; // Default to Groceries (index 2)
+  int _selectedIndex = 2; // Groceries tab
+  List<dynamic> groceries = [];
+  List<dynamic> filteredGroceries = [];
+  List<Map<String, dynamic>> cart = [];
+  bool isLoading = true;
+  String searchQuery = '';
+  String selectedLocation = 'All';
+  final ApiService _apiService = ApiService();
 
   @override
   void initState() {
@@ -22,7 +31,7 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
-    _fadeAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(_animationController);
+    _fetchGroceries();
   }
 
   @override
@@ -31,9 +40,88 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
     super.dispose();
   }
 
+  Future<void> _fetchGroceries() async {
+    setState(() => isLoading = true);
+    try {
+      final data = await _apiService.getGroceries();
+      setState(() {
+        groceries = data;
+        filteredGroceries = data;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() => isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading groceries: $e')),
+      );
+    }
+  }
+
+  void _filterGroceries() {
+    setState(() {
+      filteredGroceries = groceries.where((item) {
+        final matchesName = item['items'].any((i) => i['name'].toLowerCase().contains(searchQuery.toLowerCase()));
+        // Add location filter if your API supports it; for now, we'll skip it
+        return matchesName;
+      }).toList();
+    });
+  }
+
+  void _addToCart(dynamic grocery) {
+    setState(() {
+      for (var item in grocery['items']) {
+        cart.add({
+          'id': grocery['id'],
+          'name': item['name'],
+          'price': item['price'],
+          'quantity': 1,
+          'image': item['image'],
+        });
+      }
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Items from grocery #${grocery['id']} added to cart!'), backgroundColor: accentColor),
+    );
+  }
+
+  Future<void> _checkout() async {
+    if (cart.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cart is empty!'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    try {
+      final groceryItems = cart.map((item) => ({
+            'name': item['name'],
+            'quantity': item['quantity'],
+            'price': item['price'],
+            'image': item['image'],
+          })).toList();
+
+      final newGrocery = await _apiService.createGrocery(groceryItems);
+      final groceryId = newGrocery['id'].toString();
+
+      final paymentUrl = await _apiService.initiateCheckout(groceryId);
+      if (await canLaunch(paymentUrl)) {
+        await launch(paymentUrl);
+        setState(() => cart.clear());
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment initiated!'), backgroundColor: accentColor),
+        );
+      } else {
+        throw 'Could not launch $paymentUrl';
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Checkout error: $e'), backgroundColor: Colors.redAccent),
+      );
+    }
+  }
+
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
-
     final routes = {
       0: '/home',
       1: '/restaurants',
@@ -41,15 +129,10 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
       4: '/profile',
       5: '/restaurant-owner',
     };
-
     if (index != 2 && routes.containsKey(index)) {
       Navigator.pushReplacementNamed(context, routes[index]!);
     } else if (index == 1) {
-      // Navigate to RestaurantScreen explicitly
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const RestaurantScreen()),
-      );
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RestaurantScreen()));
     }
   }
 
@@ -60,6 +143,12 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
         title: Text('Groceries', style: GoogleFonts.poppins(color: Colors.white)),
         backgroundColor: primaryColor,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: isLoading ? null : _fetchGroceries,
+          ),
+        ],
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -69,110 +158,78 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
             colors: [primaryColor.withOpacity(0.1), Colors.white],
           ),
         ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header Image
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Image.network(
-                  'https://cdn.pixabay.com/photo/2016/03/27/22/22/vegetables-1284976_1280.jpg',
-                  height: 200,
-                  width: double.infinity,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      height: 200,
-                      width: double.infinity,
-                      color: Colors.grey[300],
-                      child: const Center(child: CircularProgressIndicator()),
-                    );
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    debugPrint('Grocery image load error: $error');
-                    return Container(
-                      height: 200,
-                      width: double.infinity,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.broken_image, size: 100, color: Colors.grey),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Title
-              Text(
-                'Shop Fresh Groceries',
-                style: GoogleFonts.poppins(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Explore our range of fresh produce and pantry staples!',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  color: textColor.withOpacity(0.7),
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Grocery Categories Grid
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 0.85,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
                 children: [
-                  _buildCategoryCard(
-                    'Fruits',
-                    'https://cdn.pixabay.com/photo/2010/12/13/09/51/fruit-2276_1280.jpg',
-                    () => _showComingSoon(context),
+                  TextField(
+                    decoration: InputDecoration(
+                      hintText: 'Search by name...',
+                      hintStyle: GoogleFonts.poppins(color: textColor.withOpacity(0.5)),
+                      prefixIcon: const Icon(Icons.search, color: primaryColor),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    onChanged: (value) {
+                      searchQuery = value;
+                      _filterGroceries();
+                    },
                   ),
-                  _buildCategoryCard(
-                    'Vegetables',
-                    'https://cdn.pixabay.com/photo/2016/03/05/19/02/vegetables-1238252_1280.jpg',
-                    () => _showComingSoon(context),
-                  ),
-                  _buildCategoryCard(
-                    'Dairy',
-                    'https://cdn.pixabay.com/photo/2017/07/05/15/13/milk-2474993_1280.jpg',
-                    () => _showComingSoon(context),
-                  ),
-                  _buildCategoryCard(
-                    'Pantry',
-                    'https://cdn.pixabay.com/photo/2015/12/09/17/11/pasta-1085056_1280.jpg',
-                    () => _showComingSoon(context),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: selectedLocation,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    items: ['All'].map((location) { // Simplified for now; expand if API supports locations
+                      return DropdownMenuItem(value: location, child: Text(location, style: GoogleFonts.poppins()));
+                    }).toList(),
+                    onChanged: (value) {
+                      selectedLocation = value!;
+                      _filterGroceries();
+                    },
                   ),
                 ],
               ),
-              const SizedBox(height: 32),
-              // Call to Action Button
-              Center(
-                child: FadeTransition(
-                  opacity: _fadeAnimation,
-                  child: ElevatedButton(
-                    onPressed: () => _showComingSoon(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: primaryColor,
-                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            Expanded(
+              child: isLoading
+                  ? const Center(child: CircularProgressIndicator(color: primaryColor))
+                  : filteredGroceries.isEmpty
+                      ? Center(child: Text('No groceries found', style: GoogleFonts.poppins(fontSize: 20, color: textColor.withOpacity(0.7))))
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          itemCount: filteredGroceries.length,
+                          itemBuilder: (context, index) {
+                            final grocery = filteredGroceries[index];
+                            return _buildGroceryItem(grocery);
+                          },
+                        ),
+            ),
+            if (cart.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Cart: ${cart.length} items',
+                      style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
                     ),
-                    child: Text(
-                      'Browse All',
-                      style: GoogleFonts.poppins(fontSize: 16, color: Colors.white),
+                    ElevatedButton(
+                      onPressed: _checkout,
+                      style: ElevatedButton.styleFrom(backgroundColor: primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                      child: Text('Checkout', style: GoogleFonts.poppins(color: Colors.white)),
                     ),
-                  ),
+                  ],
                 ),
               ),
-            ],
-          ),
+          ],
         ),
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -193,63 +250,49 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
     );
   }
 
-  Widget _buildCategoryCard(String title, String imageUrl, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              child: Image.network(
-                imageUrl,
-                height: 120,
-                width: double.infinity,
+  Widget _buildGroceryItem(dynamic grocery) {
+    return Card(
+      elevation: 4,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ListTile(
+        leading: grocery['items'].isNotEmpty && grocery['items'][0]['image'] != null
+            ? Image.network(
+                grocery['items'][0]['image'],
+                width: 50,
+                height: 50,
                 fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    height: 120,
-                    color: Colors.grey[300],
-                    child: const Center(child: CircularProgressIndicator()),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  debugPrint('Category image load error for $title: $error');
-                  return Container(
-                    height: 120,
-                    color: Colors.grey[300],
-                    child: const Icon(Icons.broken_image, color: Colors.grey),
-                  );
-                },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Text(
-                title,
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: accentColor.withOpacity(0.3),
+                  ),
+                  child: const Icon(Icons.image_not_supported, color: Colors.white),
                 ),
+              )
+            : Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(8),
+                  color: accentColor.withOpacity(0.3),
+                ),
+                child: const Icon(Icons.image_not_supported, color: Colors.white),
               ),
-            ),
-          ],
+        title: Text(
+          'Grocery #${grocery['id']}',
+          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor),
         ),
-      ),
-    );
-  }
-
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Coming Soon! Stay tuned for updates.'),
-        backgroundColor: accentColor,
-        duration: Duration(seconds: 2),
+        subtitle: Text(
+          '\$${grocery['total_amount']} - ${grocery['items'].length} items',
+          style: GoogleFonts.poppins(color: textColor.withOpacity(0.7)),
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.add_shopping_cart, color: primaryColor),
+          onPressed: () => _addToCart(grocery),
+        ),
       ),
     );
   }

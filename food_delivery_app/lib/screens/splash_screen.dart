@@ -18,7 +18,7 @@ class SplashScreen extends StatelessWidget {
           children: [
             const Icon(Icons.fastfood, size: 100, color: primaryColor),
             Text(
-              'Chiw Express',
+              'CanIbuyYouAmeal',
               style: GoogleFonts.poppins(
                 fontSize: 32,
                 fontWeight: FontWeight.bold,

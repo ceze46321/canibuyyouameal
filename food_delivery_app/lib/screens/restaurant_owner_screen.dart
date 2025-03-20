@@ -15,11 +15,24 @@ class _RestaurantOwnerScreenState extends State<RestaurantOwnerScreen> {
   List<dynamic> restaurantOrders = [];
   bool isLoading = true;
   final Map<String, bool> _confirmLoading = {};
-  int _selectedIndex = 4; // Default to Owner tab (index 4)
+  int _selectedIndex = 4; // Default to Owner tab
 
   @override
   void initState() {
     super.initState();
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    if (!auth.isRestaurantOwner) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Only restaurant owners can access this page'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        Navigator.pushReplacementNamed(context, '/home');
+      });
+      return;
+    }
     _fetchRestaurantOrders();
   }
 
@@ -62,9 +75,8 @@ class _RestaurantOwnerScreenState extends State<RestaurantOwnerScreen> {
   }
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    setState(() => _selectedIndex = index);
     switch (index) {
       case 0:
         Navigator.pushReplacementNamed(context, '/home');
@@ -79,7 +91,16 @@ class _RestaurantOwnerScreenState extends State<RestaurantOwnerScreen> {
         Navigator.pushReplacementNamed(context, '/profile');
         break;
       case 4:
-        // Stay on RestaurantOwnerScreen (no navigation needed)
+        if (!auth.isRestaurantOwner) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Only restaurant owners can access this page'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+          setState(() => _selectedIndex = 0); // Default to Home
+          Navigator.pushReplacementNamed(context, '/home');
+        }
         break;
     }
   }
@@ -166,26 +187,11 @@ class _RestaurantOwnerScreenState extends State<RestaurantOwnerScreen> {
             ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.restaurant),
-            label: 'Restaurants',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart),
-            label: 'Orders',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.store),
-            label: 'Owner',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.restaurant), label: 'Restaurants'),
+          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Orders'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Owner'),
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: primaryColor,

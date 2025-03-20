@@ -12,19 +12,20 @@ class AuthProvider with ChangeNotifier {
   String? _name;
   String? _email;
   String? _role;
-  String? _deliveryLocation; // Added delivery location field
+  String? _deliveryLocation;
   List<CartItem> _cartItems = [];
-  static const bool _isWeb = identical(0, 0.0); // True on web, false on native
+  static const bool _isWeb = identical(0, 0.0);
 
   // Getters
   String? get token => _token;
   String? get name => _name;
   String? get email => _email;
   String? get role => _role;
-  String? get deliveryLocation => _deliveryLocation; // Added getter
+  String? get deliveryLocation => _deliveryLocation;
   bool get isLoggedIn => _token != null;
   List<CartItem> get cartItems => _cartItems;
   double get cartTotal => _cartItems.fold(0, (sum, item) => sum + (item.price * item.quantity));
+  bool get isRestaurantOwner => _role == 'restaurant_owner'; // Added
 
   AuthProvider() {
     if (_isWeb) {
@@ -118,7 +119,7 @@ class AuthProvider with ChangeNotifier {
       _name = response['user']['name'] ?? name;
       _email = response['user']['email'] ?? email;
       _role = response['user']['role'] ?? role;
-      _deliveryLocation = response['user']['delivery_location']; // Added
+      _deliveryLocation = response['user']['delivery_location'];
       if (_isWeb) {
         html.window.localStorage['auth_token'] = _token!;
       } else {
@@ -141,7 +142,7 @@ class AuthProvider with ChangeNotifier {
       _name = response['user']['name'];
       _email = response['user']['email'];
       _role = response['user']['role'];
-      _deliveryLocation = response['user']['delivery_location']; // Added
+      _deliveryLocation = response['user']['delivery_location'];
       if (_isWeb) {
         html.window.localStorage['auth_token'] = _token!;
       } else {
@@ -164,7 +165,7 @@ class AuthProvider with ChangeNotifier {
       _name = response['user']['name'];
       _email = response['user']['email'];
       _role = response['user']['role'];
-      _deliveryLocation = response['user']['delivery_location']; // Added
+      _deliveryLocation = response['user']['delivery_location'];
       if (_isWeb) {
         html.window.localStorage['auth_token'] = _token!;
       } else {
@@ -187,7 +188,7 @@ class AuthProvider with ChangeNotifier {
       _name = null;
       _email = null;
       _role = null;
-      _deliveryLocation = null; // Added
+      _deliveryLocation = null;
       _cartItems.clear();
       if (_isWeb) {
         html.window.localStorage.remove('auth_token');
@@ -208,7 +209,7 @@ class AuthProvider with ChangeNotifier {
       _name = response['name'];
       _email = response['email'];
       _role = response['role'];
-      _deliveryLocation = response['delivery_location']; // Added
+      _deliveryLocation = response['delivery_location'];
       print('AuthProvider: Profile Fetched - Name: $_name, Role: $_role, Delivery Location: $_deliveryLocation');
       notifyListeners();
       return response;
@@ -224,7 +225,7 @@ class AuthProvider with ChangeNotifier {
       _name = response['user']['name'];
       _email = response['user']['email'];
       _role = response['user']['role'];
-      _deliveryLocation = response['user']['delivery_location']; // Added
+      _deliveryLocation = response['user']['delivery_location'];
       print('AuthProvider: Profile Updated - Name: $_name, Delivery Location: $_deliveryLocation');
       notifyListeners();
     } catch (e) {

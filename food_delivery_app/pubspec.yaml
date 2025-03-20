@@ -31,3 +31,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/grocery_data.json  # Added the new JSON file

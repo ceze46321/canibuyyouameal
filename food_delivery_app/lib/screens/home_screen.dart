@@ -88,7 +88,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 fit: StackFit.expand,
                 children: [
                   Image.network(
-                    'https://i.imgur.com/tdgPsz1.png',
+                    'https://i.imgur.com/Qse69mz.png',
                     fit: BoxFit.cover,
                   ),
                   Container(
@@ -119,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Chiw Express',
+                      'Can I get You A meal Store',
                       style: GoogleFonts.poppins(fontSize: 36, fontWeight: FontWeight.bold, color: textColor, letterSpacing: 1.2),
                     ),
                     Text(
@@ -131,7 +131,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     const SizedBox(height: 30),
 
                     // Why Chiw Express Section
-                    Text('Why Chiw Express?', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor)),
+                    Text('Why Can I Buy You A Meal?', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor)),
                     const SizedBox(height: 16),
                     StaggeredGrid.count(
                       crossAxisCount: 2,
