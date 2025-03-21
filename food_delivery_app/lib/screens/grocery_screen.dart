@@ -1,9 +1,11 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_stripe/flutter_stripe.dart' as stripe;
 import '../main.dart' show primaryColor, textColor, accentColor;
-import '../services/api_service.dart'; // Import ApiService
+import '../auth_provider.dart';
+import '../models/product_model.dart';
 import 'restaurant_screen.dart';
 
 class GroceryScreen extends StatefulWidget {
@@ -15,23 +17,22 @@ class GroceryScreen extends StatefulWidget {
 
 class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
-  int _selectedIndex = 2; // Groceries tab
-  List<dynamic> groceries = [];
-  List<dynamic> filteredGroceries = [];
+  int _selectedIndex = 2;
   List<Map<String, dynamic>> cart = [];
-  bool isLoading = true;
   String searchQuery = '';
   String selectedLocation = 'All';
-  final ApiService _apiService = ApiService();
 
   @override
   void initState() {
     super.initState();
+    stripe.Stripe.publishableKey = 'pk_test_51R3VqwFo5xO98pwdjgCiM3rXeI9My0RcZHHEZPJXipbsjZ80ydOnprPsBQZQ9GEmY6aTARgWb7tWxofFLTGqINfq00seIuXSDB';
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
-    _fetchGroceries();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<AuthProvider>(context, listen: false).fetchGroceryProducts();
+    });
   }
 
   @override
@@ -40,47 +41,25 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
     super.dispose();
   }
 
-  Future<void> _fetchGroceries() async {
-    setState(() => isLoading = true);
-    try {
-      final data = await _apiService.getGroceries();
-      setState(() {
-        groceries = data;
-        filteredGroceries = data;
-        isLoading = false;
+  List<Product> _filterGroceries(List<Product> groceries) {
+    return groceries.where((product) {
+      final matchesName = product.name.toLowerCase().contains(searchQuery.toLowerCase());
+      return matchesName;
+    }).toList();
+  }
+
+  void _addToCart(Product product) {
+    setState(() {
+      cart.add({
+        'id': product.id,
+        'name': product.name,
+        'price': product.price,
+        'quantity': product.quantity,
+        'image': product.imageUrl,
       });
-    } catch (e) {
-      setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading groceries: $e')),
-      );
-    }
-  }
-
-  void _filterGroceries() {
-    setState(() {
-      filteredGroceries = groceries.where((item) {
-        final matchesName = item['items'].any((i) => i['name'].toLowerCase().contains(searchQuery.toLowerCase()));
-        // Add location filter if your API supports it; for now, we'll skip it
-        return matchesName;
-      }).toList();
-    });
-  }
-
-  void _addToCart(dynamic grocery) {
-    setState(() {
-      for (var item in grocery['items']) {
-        cart.add({
-          'id': grocery['id'],
-          'name': item['name'],
-          'price': item['price'],
-          'quantity': 1,
-          'image': item['image'],
-        });
-      }
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Items from grocery #${grocery['id']} added to cart!'), backgroundColor: accentColor),
+      SnackBar(content: Text('${product.name} added to cart!'), backgroundColor: accentColor),
     );
   }
 
@@ -92,26 +71,64 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
       return;
     }
 
+    final paymentMethod = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Select Payment Method', style: GoogleFonts.poppins()),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text('Stripe', style: GoogleFonts.poppins()),
+              onTap: () => Navigator.pop(context, 'stripe'),
+            ),
+            ListTile(
+              title: Text('Flutterwave', style: GoogleFonts.poppins()),
+              onTap: () => Navigator.pop(context, 'flutterwave'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (paymentMethod == null) return;
+
     try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final groceryItems = cart.map((item) => ({
             'name': item['name'],
             'quantity': item['quantity'],
             'price': item['price'],
             'image': item['image'],
           })).toList();
-
-      final newGrocery = await _apiService.createGrocery(groceryItems);
+      final newGrocery = await authProvider.createGrocery(groceryItems);
       final groceryId = newGrocery['id'].toString();
+      final response = await authProvider.initiateCheckout(groceryId, paymentMethod: paymentMethod);
 
-      final paymentUrl = await _apiService.initiateCheckout(groceryId);
-      if (await canLaunch(paymentUrl)) {
-        await launch(paymentUrl);
+      if (paymentMethod == 'stripe') {
+        final clientSecret = response['client_secret'];
+        await stripe.Stripe.instance.initPaymentSheet(
+          paymentSheetParameters: stripe.SetupPaymentSheetParameters(
+            paymentIntentClientSecret: clientSecret,
+            merchantDisplayName: 'Chiw Express',
+          ),
+        );
+        await stripe.Stripe.instance.presentPaymentSheet();
         setState(() => cart.clear());
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Payment initiated!'), backgroundColor: accentColor),
+          const SnackBar(content: Text('Payment successful!'), backgroundColor: accentColor),
         );
-      } else {
-        throw 'Could not launch $paymentUrl';
+      } else if (paymentMethod == 'flutterwave') {
+        final paymentLink = response['payment_link'];
+        if (await canLaunchUrl(Uri.parse(paymentLink))) {
+          await launchUrl(Uri.parse(paymentLink), mode: LaunchMode.externalApplication);
+          // Note: Cart clearing depends on payment confirmation (e.g., via webhook or manual check)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Payment initiated! Complete in browser.'), backgroundColor: accentColor),
+          );
+        } else {
+          throw 'Could not launch $paymentLink';
+        }
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -136,163 +153,224 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Groceries', style: GoogleFonts.poppins(color: Colors.white)),
-        backgroundColor: primaryColor,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: isLoading ? null : _fetchGroceries,
-          ),
-        ],
-      ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [primaryColor.withOpacity(0.1), Colors.white],
+  void _showImageZoomDialog(BuildContext context, String? imageUrl) {
+    if (imageUrl == null) return;
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: InteractiveViewer(
+            boundaryMargin: const EdgeInsets.all(20.0),
+            minScale: 0.5,
+            maxScale: 3.0,
+            child: Image.network(
+              imageUrl,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => const Icon(Icons.error, size: 100, color: Colors.white),
+            ),
           ),
         ),
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  TextField(
-                    decoration: InputDecoration(
-                      hintText: 'Search by name...',
-                      hintStyle: GoogleFonts.poppins(color: textColor.withOpacity(0.5)),
-                      prefixIcon: const Icon(Icons.search, color: primaryColor),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                    onChanged: (value) {
-                      searchQuery = value;
-                      _filterGroceries();
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<String>(
-                    value: selectedLocation,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      filled: true,
-                      fillColor: Colors.white,
-                    ),
-                    items: ['All'].map((location) { // Simplified for now; expand if API supports locations
-                      return DropdownMenuItem(value: location, child: Text(location, style: GoogleFonts.poppins()));
-                    }).toList(),
-                    onChanged: (value) {
-                      selectedLocation = value!;
-                      _filterGroceries();
-                    },
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: isLoading
-                  ? const Center(child: CircularProgressIndicator(color: primaryColor))
-                  : filteredGroceries.isEmpty
-                      ? Center(child: Text('No groceries found', style: GoogleFonts.poppins(fontSize: 20, color: textColor.withOpacity(0.7))))
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          itemCount: filteredGroceries.length,
-                          itemBuilder: (context, index) {
-                            final grocery = filteredGroceries[index];
-                            return _buildGroceryItem(grocery);
-                          },
-                        ),
-            ),
-            if (cart.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Cart: ${cart.length} items',
-                      style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
-                    ),
-                    ElevatedButton(
-                      onPressed: _checkout,
-                      style: ElevatedButton.styleFrom(backgroundColor: primaryColor, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                      child: Text('Checkout', style: GoogleFonts.poppins(color: Colors.white)),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.restaurant), label: 'Restaurants'),
-          BottomNavigationBarItem(icon: Icon(Icons.local_grocery_store), label: 'Groceries'),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Orders'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-          BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Owner'),
-        ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: primaryColor,
-        unselectedItemColor: textColor.withOpacity(0.6),
-        onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed,
       ),
     );
   }
 
-  Widget _buildGroceryItem(dynamic grocery) {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        final groceries = authProvider.groceryProducts;
+        final filteredGroceries = _filterGroceries(groceries);
+
+        return Scaffold(
+          appBar: AppBar(
+            title: Text('Groceries', style: GoogleFonts.poppins(color: Colors.white)),
+            backgroundColor: primaryColor,
+            elevation: 0,
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: authProvider.isLoggedIn ? () => authProvider.fetchGroceryProducts() : null,
+              ),
+            ],
+          ),
+          body: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [primaryColor.withOpacity(0.1), Colors.white],
+              ),
+            ),
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Search by name...',
+                          hintStyle: GoogleFonts.poppins(color: textColor.withOpacity(0.5)),
+                          prefixIcon: const Icon(Icons.search, color: primaryColor),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                        onChanged: (value) {
+                          setState(() => searchQuery = value);
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        value: selectedLocation,
+                        decoration: InputDecoration(
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          filled: true,
+                          fillColor: Colors.white,
+                        ),
+                        items: ['All'].map((location) {
+                          return DropdownMenuItem(value: location, child: Text(location, style: GoogleFonts.poppins()));
+                        }).toList(),
+                        onChanged: (value) {
+                          setState(() => selectedLocation = value!);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: !authProvider.isLoggedIn
+                      ? const Center(child: Text('Please log in to view groceries'))
+                      : groceries.isEmpty
+                          ? const Center(child: CircularProgressIndicator(color: primaryColor))
+                          : filteredGroceries.isEmpty
+                              ? Center(
+                                  child: Text(
+                                    'No groceries found',
+                                    style: GoogleFonts.poppins(fontSize: 20, color: textColor.withOpacity(0.7)),
+                                  ),
+                                )
+                              : GridView.builder(
+                                  padding: const EdgeInsets.all(16),
+                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: 2,
+                                    crossAxisSpacing: 16,
+                                    mainAxisSpacing: 16,
+                                    childAspectRatio: 0.75,
+                                  ),
+                                  itemCount: filteredGroceries.length,
+                                  itemBuilder: (context, index) {
+                                    final product = filteredGroceries[index];
+                                    return _buildGroceryItem(product);
+                                  },
+                                ),
+                ),
+                if (cart.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Cart: ${cart.length} items',
+                          style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                        ),
+                        ElevatedButton(
+                          onPressed: _checkout,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: primaryColor,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: Text('Checkout', style: GoogleFonts.poppins(color: Colors.white)),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          bottomNavigationBar: BottomNavigationBar(
+            items: const [
+              BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+              BottomNavigationBarItem(icon: Icon(Icons.restaurant), label: 'Restaurants'),
+              BottomNavigationBarItem(icon: Icon(Icons.local_grocery_store), label: 'Groceries'),
+              BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Orders'),
+              BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+              BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Owner'),
+            ],
+            currentIndex: _selectedIndex,
+            selectedItemColor: primaryColor,
+            unselectedItemColor: textColor.withOpacity(0.6),
+            onTap: _onItemTapped,
+            type: BottomNavigationBarType.fixed,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGroceryItem(Product product) {
     return Card(
       elevation: 4,
-      margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        leading: grocery['items'].isNotEmpty && grocery['items'][0]['image'] != null
-            ? Image.network(
-                grocery['items'][0]['image'],
-                width: 50,
-                height: 50,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: accentColor.withOpacity(0.3),
-                  ),
-                  child: const Icon(Icons.image_not_supported, color: Colors.white),
-                ),
-              )
-            : Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  color: accentColor.withOpacity(0.3),
-                ),
-                child: const Icon(Icons.image_not_supported, color: Colors.white),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _showImageZoomDialog(context, product.imageUrl),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                child: product.imageUrl != null
+                    ? Image.network(
+                        product.imageUrl!,
+                        fit: BoxFit.cover,
+                        height: 150,
+                        width: double.infinity,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          height: 150,
+                          color: accentColor.withOpacity(0.3),
+                          child: const Icon(Icons.image_not_supported, color: Colors.white, size: 50),
+                        ),
+                      )
+                    : Container(
+                        height: 150,
+                        color: accentColor.withOpacity(0.3),
+                        child: const Icon(Icons.image_not_supported, color: Colors.white, size: 50),
+                      ),
               ),
-        title: Text(
-          'Grocery #${grocery['id']}',
-          style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor),
-        ),
-        subtitle: Text(
-          '\$${grocery['total_amount']} - ${grocery['items'].length} items',
-          style: GoogleFonts.poppins(color: textColor.withOpacity(0.7)),
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.add_shopping_cart, color: primaryColor),
-          onPressed: () => _addToCart(grocery),
-        ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  product.name,
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '₦${product.price} (Qty: ${product.quantity})',
+                  style: GoogleFonts.poppins(color: textColor.withOpacity(0.7)),
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    icon: const Icon(Icons.add_shopping_cart, color: primaryColor),
+                    onPressed: () => _addToCart(product),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

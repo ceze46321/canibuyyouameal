@@ -4,32 +4,34 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.0.0 <4.0.0'  # Keep for Dart 3.7.2
 
 dependencies:
   flutter:
     sdk: flutter
-  provider: ^6.1.2          # State management
-  http: ^1.2.1             # HTTP requests
-  google_fonts: ^6.2.1      # Google Fonts
-  flutter_spinkit: ^5.2.1   # Loading indicators
-  geocoding: ^3.0.0         # Geocoding services
-  google_sign_in: ^6.2.1    # Google Sign-In
-  flutter_dotenv: ^5.1.0    # Environment variables
-  url_launcher: ^6.2.4      # For launching Flutterwave payment link
-  webview_flutter: ^4.7.0   # For embedding Flutterwave payment link
-  flutter_secure_storage: ^9.0.0  # Secure token storage (latest)
-  flutter_stripe: ^11.4.0   # Updated to latest compatible version
+  provider: ^6.1.2
+  http: ^1.2.1
+  google_fonts: ^6.2.1
+  flutter_spinkit: ^5.2.1
+  geocoding: ^3.0.0
+  google_sign_in: ^6.2.1
+  flutter_dotenv: ^5.1.0
+  url_launcher: ^6.2.4      # Already present, keep it
+  webview_flutter: ^4.7.0
+  flutter_secure_storage: ^9.0.0
+  flutter_stripe: ^11.0.0   # For Stripe payments
   uni_links: ^0.5.1
   flutter_staggered_grid_view: ^0.7.0
   flutter_animate: ^4.5.2
-  
+  shared_preferences: ^2.2.3
+  # Removed flutterwave_standard
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0     # Updated to latest
+  flutter_lints: ^5.0.0
 
 flutter:
   uses-material-design: true
   assets:
-    - assets/grocery_data.json  # Added the new JSON file
+    - assets/grocery_data.json

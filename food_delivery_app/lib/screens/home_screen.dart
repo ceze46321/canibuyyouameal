@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../auth_provider.dart';
-import '../main.dart' show primaryColor, textColor, accentColor;
+import '../main.dart' show textColor, accentColor;
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -49,12 +50,85 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
     switch (index) {
-      case 0: break;
-      case 1: Navigator.pushReplacementNamed(context, '/restaurants'); break;
-      case 2: Navigator.pushReplacementNamed(context, '/orders'); break;
-      case 3: Navigator.pushReplacementNamed(context, '/profile'); break;
-      case 4: Navigator.pushReplacementNamed(context, '/restaurant-owner'); break;
+      case 0:
+        break;
+      case 1:
+        Navigator.pushReplacementNamed(context, '/restaurants');
+        break;
+      case 2:
+        Navigator.pushReplacementNamed(context, '/orders');
+        break;
+      case 3:
+        Navigator.pushReplacementNamed(context, '/profile');
+        break;
+      case 4:
+        Navigator.pushReplacementNamed(context, '/restaurant-owner');
+        break;
     }
+  }
+
+  void _showTermsAndConditions() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Terms and Conditions', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor)),
+        content: SingleChildScrollView(
+          child: Text(
+            '''
+Welcome to Chiw Express! By using this app, you agree to:
+
+1. **Usage**: Use the app for lawful purposes only.
+2. **Account**: Keep your credentials secure; you’re responsible for all activity.
+3. **Roles**: Your role (Customer, Merchant, Dasher) defines your permissions.
+4. **Payments**: Transactions are processed securely; refunds follow our policy.
+5. **Liability**: We’re not liable for third-party service issues.
+
+Full terms at chiwexpress.com/terms.
+            ''',
+            style: GoogleFonts.poppins(fontSize: 14, color: textColor.withOpacity(0.8)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close', style: GoogleFonts.poppins(color: const Color(0xFFEF2A39))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPrivacyPolicy() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Text('Privacy Policy', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor)),
+        content: SingleChildScrollView(
+          child: Text(
+            '''
+At Chiw Express, your privacy matters:
+
+1. **Data Collection**: We collect name, email, and role for account creation.
+2. **Usage**: Data is used to provide and improve services.
+3. **Security**: Your info is encrypted and stored securely.
+4. **Sharing**: Limited to service providers as needed.
+5. **Rights**: Contact support@chiwexpress.com to manage your data.
+
+Full policy at chiwexpress.com/privacy.
+            ''',
+            style: GoogleFonts.poppins(fontSize: 14, color: textColor.withOpacity(0.8)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Close', style: GoogleFonts.poppins(color: const Color(0xFFEF2A39))),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -70,162 +144,264 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final userRole = auth.role ?? 'Visitor';
 
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 300.0,
-            floating: false,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
-              title: Text(
-                'Welcome, $userName!',
-                style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white, shadows: [
-                  Shadow(color: Colors.black.withOpacity(0.5), blurRadius: 4, offset: const Offset(2, 2)),
-                ]),
-              ),
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
-                    'https://i.imgur.com/Qse69mz.png',
-                    fit: BoxFit.cover,
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.black.withOpacity(0.7), Colors.transparent],
-                      ),
-                    ),
-                  ),
+      body: Stack(
+        children: [
+          // DoorDash-inspired background
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  const Color(0xFFEF2A39), // DoorDash Red
+                  const Color(0xFFD81B23).withOpacity(0.9),
+                  Colors.white.withOpacity(0.95),
                 ],
+                stops: const [0.0, 0.5, 1.0],
               ),
             ),
-            backgroundColor: primaryColor,
-            elevation: 8,
-            actions: [
-              IconButton(icon: const Icon(Icons.person, color: Colors.white), onPressed: () => Navigator.pushNamed(context, '/dashboard')),
-              IconButton(icon: const Icon(Icons.account_circle, color: Colors.white), onPressed: () => Navigator.pushNamed(context, '/profile')),
-            ],
           ),
-          SliverToBoxAdapter(
-            child: FadeTransition(
-              opacity: _fadeAnimation,
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Can I get You A meal Store',
-                      style: GoogleFonts.poppins(fontSize: 36, fontWeight: FontWeight.bold, color: textColor, letterSpacing: 1.2),
-                    ),
-                    Text(
-                      'Your Nigerian Food Adventure Awaits',
-                      style: GoogleFonts.poppins(fontSize: 18, color: textColor.withOpacity(0.8), fontStyle: FontStyle.italic),
-                    ),
-                    const SizedBox(height: 8),
-                    Text('Role: $userRole', style: GoogleFonts.poppins(fontSize: 14, color: accentColor)),
-                    const SizedBox(height: 30),
-
-                    // Why Chiw Express Section
-                    Text('Why Can I Buy You A Meal?', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor)),
-                    const SizedBox(height: 16),
-                    StaggeredGrid.count(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      children: [
-                        _buildFeatureTile(Icons.local_dining, 'Authentic Taste', 'Savor Nigeria’s finest dishes.'),
-                        _buildFeatureTile(Icons.flash_on, 'Fast Delivery', 'Food at your door in minutes.'),
-                        _buildFeatureTile(Icons.verified, 'Trusted Service', 'Reliable every time.'),
-                        _buildFeatureTile(Icons.people, 'Community', 'Support local vendors.'),
+          Positioned.fill(
+            child: CustomPaint(
+              painter: SubtleTexturePainter(),
+            ),
+          ),
+          Column(
+            children: [
+              Expanded(
+                child: CustomScrollView(
+                  slivers: [
+                    SliverAppBar(
+                      expandedHeight: 300.0,
+                      floating: false,
+                      pinned: true,
+                      flexibleSpace: FlexibleSpaceBar(
+                        titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
+                        title: Text(
+                          'Welcome, $userName!',
+                          style: GoogleFonts.poppins(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            shadows: [
+                              Shadow(color: Colors.black.withOpacity(0.5), blurRadius: 4, offset: const Offset(2, 2)),
+                            ],
+                          ),
+                        ),
+                        background: ClipRRect(
+                          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+                          child: Image.network(
+                            'https://i.imgur.com/Qse69mz.png',
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Container(
+                              color: const Color(0xFFEF2A39).withOpacity(0.8),
+                              child: const Icon(Icons.fastfood, size: 100, color: Colors.white),
+                            ),
+                          ),
+                        ),
+                      ),
+                      backgroundColor: const Color(0xFFEF2A39),
+                      elevation: 8,
+                      actions: [
+                        IconButton(
+                          icon: const Icon(Icons.person, color: Colors.white),
+                          onPressed: () => Navigator.pushNamed(context, '/dashboard'),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.account_circle, color: Colors.white),
+                          onPressed: () => Navigator.pushNamed(context, '/profile'),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 30),
-
-                    // Featured Restaurants Section
-                    Text('Featured Restaurants', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor)),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      height: 220,
-                      child: isLoading
-                          ? const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(primaryColor)))
-                          : restaurants.isEmpty
-                              ? Center(child: Text('No restaurants yet', style: GoogleFonts.poppins(color: textColor.withOpacity(0.7))))
-                              : ListView.builder(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: restaurants.length,
-                                  itemBuilder: (context, index) => _buildRestaurantCard(restaurants[index]),
+                    SliverToBoxAdapter(
+                      child: FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: Padding(
+                          padding: const EdgeInsets.all(20.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Can I Buy You A Meal',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.bold,
+                                  color: textColor,
+                                  letterSpacing: 1.2,
                                 ),
-                    ),
-                    const SizedBox(height: 30),
+                              ),
+                              Text(
+                                'Your Nigerian Food Adventure Awaits',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 18,
+                                  color: textColor.withOpacity(0.8),
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Role: $userRole',
+                                style: GoogleFonts.poppins(fontSize: 14, color: const Color(0xFFEF2A39)),
+                              ),
+                              const SizedBox(height: 30),
 
-                    // Top Dishes Section
-                    Text('Top Dishes', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor)),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      height: 180,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: [
-                          _buildDishCard('Jollof Rice', 'https://i.imgur.com/8xN5K9P.jpg', 'Spicy & Savory'),
-                          _buildDishCard('Pounded Yam', 'https://i.imgur.com/5zX7vQw.jpg', 'With Egusi Soup'),
-                          _buildDishCard('Suya', 'https://i.imgur.com/Q3mK9tL.jpg', 'Grilled Perfection'),
-                        ],
+                              // Why Chiw Express Section
+                              Text(
+                                'Why Can I Buy You A Meal?',
+                                style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
+                              ),
+                              const SizedBox(height: 16),
+                              StaggeredGrid.count(
+                                crossAxisCount: 2,
+                                mainAxisSpacing: 16,
+                                crossAxisSpacing: 16,
+                                children: [
+                                  _buildFeatureTile(Icons.local_dining, 'Authentic Taste', 'Savor Nigeria’s finest dishes.'),
+                                  _buildFeatureTile(Icons.flash_on, 'Fast Delivery', 'Food at your door in minutes.'),
+                                  _buildFeatureTile(Icons.verified, 'Trusted Service', 'Reliable every time.'),
+                                  _buildFeatureTile(Icons.people, 'Community', 'Support local vendors.'),
+                                ],
+                              ),
+                              const SizedBox(height: 30),
+
+                              // Featured Restaurants Section
+                              Text(
+                                'Featured Restaurants',
+                                style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                height: 220,
+                                child: isLoading
+                                    ? const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEF2A39))))
+                                    : restaurants.isEmpty
+                                        ? Center(
+                                            child: Text(
+                                              'No restaurants yet',
+                                              style: GoogleFonts.poppins(color: textColor.withOpacity(0.7)),
+                                            ),
+                                          )
+                                        : ListView.builder(
+                                            scrollDirection: Axis.horizontal,
+                                            itemCount: restaurants.length,
+                                            itemBuilder: (context, index) => _buildRestaurantCard(restaurants[index]),
+                                          ),
+                              ),
+                              const SizedBox(height: 30),
+
+                              // Top Dishes Section
+                              Text(
+                                'Top Dishes',
+                                style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                height: 180,
+                                child: ListView(
+                                  scrollDirection: Axis.horizontal,
+                                  children: [
+                                    _buildDishCard('Jollof Rice', 'https://i.imgur.com/8xN5K9P.jpg', 'Spicy & Savory'),
+                                    _buildDishCard('Pounded Yam', 'https://i.imgur.com/5zX7vQw.jpg', 'With Egusi Soup'),
+                                    _buildDishCard('Suya', 'https://i.imgur.com/Q3mK9tL.jpg', 'Grilled Perfection'),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 30),
+
+                              // Testimonials Section
+                              Text(
+                                'What Our Users Say',
+                                style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
+                              ),
+                              const SizedBox(height: 16),
+                              _buildTestimonialCarousel(),
+                              const SizedBox(height: 30),
+
+                              // Quick Actions Section
+                              Text(
+                                'Quick Actions',
+                                style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
+                              ),
+                              const SizedBox(height: 16),
+                              Wrap(
+                                spacing: 16,
+                                runSpacing: 16,
+                                alignment: WrapAlignment.center,
+                                children: [
+                                  _buildActionButton(context, 'Order Now', Icons.fastfood, () => Navigator.pushNamed(context, '/restaurants')),
+                                  _buildActionButton(context, 'Track Order', Icons.local_shipping, () => Navigator.pushNamed(context, '/orders')),
+                                  _buildActionButton(context, 'Groceries', Icons.local_grocery_store, () => Navigator.pushNamed(context, '/groceries')),
+                                  if (userRole == 'owner' || userRole == 'merchant')
+                                    _buildActionButton(context, 'Add Restaurant', Icons.store, () => Navigator.pushNamed(context, '/add-restaurant').then((_) => _fetchRestaurants())),
+                                  if (userRole == 'dasher')
+                                    _buildActionButton(context, 'Deliver', Icons.directions_bike, () => Navigator.pushNamed(context, '/dashers')),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 30),
-
-                    // Testimonials Section
-                    Text('What Our Users Say', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor)),
-                    const SizedBox(height: 16),
-                    _buildTestimonialCarousel(),
-                    const SizedBox(height: 30),
-
-                    // Quick Actions Section
-                    Text('Quick Actions', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor)),
-                    const SizedBox(height: 16),
-                    Wrap(
-                      spacing: 16,
-                      runSpacing: 16,
-                      alignment: WrapAlignment.center,
-                      children: [
-                        _buildActionButton(context, 'Order Now', Icons.fastfood, () => Navigator.pushNamed(context, '/restaurants')),
-                        _buildActionButton(context, 'Track Order', Icons.local_shipping, () => Navigator.pushNamed(context, '/orders')),
-                        _buildActionButton(context, 'Groceries', Icons.local_grocery_store, () => Navigator.pushNamed(context, '/groceries')),
-                        if (userRole == 'owner' || userRole == 'merchant')
-                          _buildActionButton(context, 'Add Restaurant', Icons.store, () => Navigator.pushNamed(context, '/add-restaurant').then((_) => _fetchRestaurants())),
-                        if (userRole == 'dasher')
-                          _buildActionButton(context, 'Deliver', Icons.directions_bike, () => Navigator.pushNamed(context, '/dashers')),
-                      ],
+                    SliverToBoxAdapter(
+                      child: Container(
+                        color: const Color(0xFFEF2A39).withOpacity(0.05),
+                        padding: const EdgeInsets.all(20.0),
+                        child: Column(
+                          children: [
+                            Text(
+                              'Explore More',
+                              style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: textColor),
+                            ),
+                            const SizedBox(height: 16),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                _buildFooterButton(context, 'Restaurants', () => Navigator.pushNamed(context, '/restaurants')),
+                                _buildFooterButton(context, 'Orders', () => Navigator.pushNamed(context, '/orders')),
+                                _buildFooterButton(context, 'Logistics', () => Navigator.pushNamed(context, '/logistics')),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: Container(
-              color: primaryColor.withOpacity(0.05),
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                children: [
-                  Text('Explore More', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: textColor)),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildFooterButton(context, 'Restaurants', () => Navigator.pushNamed(context, '/restaurants')),
-                      _buildFooterButton(context, 'Orders', () => Navigator.pushNamed(context, '/orders')),
-                      _buildFooterButton(context, 'Logistics', () => Navigator.pushNamed(context, '/logistics')),
-                    ],
-                  ),
-                ],
+              // Bottom Navigation with Terms and Privacy
+              Container(
+                padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 24.0),
+                color: Colors.white.withOpacity(0.9),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    GestureDetector(
+                      onTap: _showTermsAndConditions,
+                      child: Text(
+                        'Terms',
+                        style: GoogleFonts.poppins(
+                          color: const Color(0xFFEF2A39),
+                          fontSize: 14,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 40),
+                    GestureDetector(
+                      onTap: _showPrivacyPolicy,
+                      child: Text(
+                        'Privacy',
+                        style: GoogleFonts.poppins(
+                          color: const Color(0xFFEF2A39),
+                          fontSize: 14,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
           ),
         ],
       ),
@@ -238,7 +414,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Owner'),
         ],
         currentIndex: _selectedIndex,
-        selectedItemColor: primaryColor,
+        selectedItemColor: const Color(0xFFEF2A39),
         unselectedItemColor: textColor.withOpacity(0.6),
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
@@ -246,7 +422,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => Navigator.pushNamed(context, '/restaurants'),
-        backgroundColor: accentColor,
+        backgroundColor: const Color(0xFFEF2A39),
         child: const Icon(Icons.fastfood, color: Colors.white),
         tooltip: 'Order Now',
       ),
@@ -263,10 +439,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       ),
       child: Column(
         children: [
-          Icon(icon, size: 40, color: primaryColor),
+          Icon(icon, size: 40, color: const Color(0xFFEF2A39)),
           const SizedBox(height: 8),
           Text(title, style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: textColor)),
-          Text(description, style: GoogleFonts.poppins(fontSize: 12, color: textColor.withOpacity(0.7)), textAlign: TextAlign.center),
+          Text(
+            description,
+            style: GoogleFonts.poppins(fontSize: 12, color: textColor.withOpacity(0.7)),
+            textAlign: TextAlign.center,
+          ),
         ],
       ),
     );
@@ -274,7 +454,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   Widget _buildRestaurantCard(dynamic restaurant) {
     return GestureDetector(
-      onTap: () => Navigator.pushNamed(context, '/restaurants'), // Could navigate to specific restaurant
+      onTap: () => Navigator.pushNamed(context, '/restaurants'),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         margin: const EdgeInsets.only(right: 16),
@@ -340,7 +520,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               child: Column(
                 children: [
                   Text(name, style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold)),
-                  Text(description, style: GoogleFonts.poppins(fontSize: 10, color: textColor.withOpacity(0.7))),
+                  Text(
+                    description,
+                    style: GoogleFonts.poppins(fontSize: 10, color: textColor.withOpacity(0.7)),
+                  ),
                 ],
               ),
             ),
@@ -379,9 +562,15 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   children: List.generate(testimonial['rating'] as int, (i) => const Icon(Icons.star, size: 16, color: Colors.amber)),
                 ),
                 const SizedBox(height: 8),
-                Text('"${testimonial['text']}"', style: GoogleFonts.poppins(fontSize: 14, fontStyle: FontStyle.italic)),
+                Text(
+                  '"${testimonial['text']}"',
+                  style: GoogleFonts.poppins(fontSize: 14, fontStyle: FontStyle.italic),
+                ),
                 const SizedBox(height: 4),
-                Text('- ${testimonial['name']}', style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold)),
+                Text(
+                  '- ${testimonial['name']}',
+                  style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold),
+                ),
               ],
             ),
           );
@@ -394,7 +583,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: primaryColor,
+        backgroundColor: const Color(0xFFEF2A39),
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         elevation: 4,
@@ -413,11 +602,30 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
-        backgroundColor: accentColor,
+        backgroundColor: const Color(0xFFEF2A39),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
       child: Text(label, style: GoogleFonts.poppins(fontSize: 16, color: Colors.white)),
     );
   }
+}
+
+// Subtle texture painter (reused from previous screens)
+class SubtleTexturePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.05)
+      ..style = PaintingStyle.fill;
+
+    for (double i = 0; i < size.width; i += 100) {
+      for (double j = 0; j < size.height; j += 100) {
+        canvas.drawCircle(Offset(i, j), 4, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

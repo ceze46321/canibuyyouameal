@@ -1,19 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:chiw_express/models/cart.dart';
-import 'services/api_service.dart';
-// Conditional imports
-import 'package:flutter_secure_storage/flutter_secure_storage.dart' if (dart.library.io) 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:chiw_express/services/api_service.dart';
+import 'package:chiw_express/models/product_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:html' as html if (dart.library.html) 'dart:html';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
-  late final dynamic _storage;
   String? _token;
   String? _name;
   String? _email;
   String? _role;
   String? _deliveryLocation;
   List<CartItem> _cartItems = [];
+  List<Product> _groceryProducts = [];
   static const bool _isWeb = identical(0, 0.0);
 
   // Getters
@@ -25,14 +25,10 @@ class AuthProvider with ChangeNotifier {
   bool get isLoggedIn => _token != null;
   List<CartItem> get cartItems => _cartItems;
   double get cartTotal => _cartItems.fold(0, (sum, item) => sum + (item.price * item.quantity));
-  bool get isRestaurantOwner => _role == 'restaurant_owner'; // Added
+  bool get isRestaurantOwner => _role == 'restaurant_owner';
+  List<Product> get groceryProducts => _groceryProducts;
 
   AuthProvider() {
-    if (_isWeb) {
-      _storage = null;
-    } else {
-      _storage = const FlutterSecureStorage();
-    }
     loadToken();
   }
 
@@ -40,16 +36,18 @@ class AuthProvider with ChangeNotifier {
     if (_isWeb) {
       _token = html.window.localStorage['auth_token'];
     } else {
-      _token = await _storage.read(key: 'auth_token');
+      final prefs = await SharedPreferences.getInstance();
+      _token = prefs.getString('auth_token');
     }
     if (_token != null) {
       _apiService.setToken(_token!);
       await getProfile();
+      await fetchGroceryProducts();
     }
     notifyListeners();
   }
 
-  // Cart management methods
+  // Cart Management Methods
   void addToCart(String name, double price, {String? restaurantName, String? id}) {
     final itemId = id ?? name;
     final existingIndex = _cartItems.indexWhere((i) => i.id == itemId);
@@ -111,7 +109,7 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Authentication methods
+  // Authentication Methods
   Future<Map<String, dynamic>> register(String name, String email, String password, String role) async {
     try {
       final response = await _apiService.register(name, email, password, role);
@@ -120,13 +118,10 @@ class AuthProvider with ChangeNotifier {
       _email = response['user']['email'] ?? email;
       _role = response['user']['role'] ?? role;
       _deliveryLocation = response['user']['delivery_location'];
-      if (_isWeb) {
-        html.window.localStorage['auth_token'] = _token!;
-      } else {
-        await _storage.write(key: 'auth_token', value: _token);
-      }
+      await _persistToken(_token!);
       _apiService.setToken(_token!);
       print('AuthProvider: Register Successful - Token: $_token, Name: $_name, Role: $_role, Delivery Location: $_deliveryLocation');
+      await fetchGroceryProducts();
       notifyListeners();
       return response;
     } catch (e) {
@@ -143,13 +138,10 @@ class AuthProvider with ChangeNotifier {
       _email = response['user']['email'];
       _role = response['user']['role'];
       _deliveryLocation = response['user']['delivery_location'];
-      if (_isWeb) {
-        html.window.localStorage['auth_token'] = _token!;
-      } else {
-        await _storage.write(key: 'auth_token', value: _token);
-      }
+      await _persistToken(_token!);
       _apiService.setToken(_token!);
       print('AuthProvider: Login Successful - Token: $_token, Name: $_name, Role: $_role, Delivery Location: $_deliveryLocation');
+      await fetchGroceryProducts();
       notifyListeners();
       return response;
     } catch (e) {
@@ -166,13 +158,10 @@ class AuthProvider with ChangeNotifier {
       _email = response['user']['email'];
       _role = response['user']['role'];
       _deliveryLocation = response['user']['delivery_location'];
-      if (_isWeb) {
-        html.window.localStorage['auth_token'] = _token!;
-      } else {
-        await _storage.write(key: 'auth_token', value: _token);
-      }
+      await _persistToken(_token!);
       _apiService.setToken(_token!);
       print('AuthProvider: Google Login Successful - Token: $_token, Name: $_name, Role: $_role, Delivery Location: $_deliveryLocation');
+      await fetchGroceryProducts();
       notifyListeners();
       return response;
     } catch (e) {
@@ -190,10 +179,12 @@ class AuthProvider with ChangeNotifier {
       _role = null;
       _deliveryLocation = null;
       _cartItems.clear();
+      _groceryProducts.clear();
       if (_isWeb) {
         html.window.localStorage.remove('auth_token');
       } else {
-        await _storage.delete(key: 'auth_token');
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('auth_token');
       }
       print('AuthProvider: Logout Successful');
       notifyListeners();
@@ -247,6 +238,50 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  // Grocery Product Fetching
+  Future<void> fetchGroceryProducts() async {
+    try {
+      final productsData = await _apiService.fetchGroceryProducts();
+      print('AuthProvider: Raw products data: $productsData');
+      _groceryProducts = productsData
+          .expand((grocery) => (grocery['items'] as List)
+              .map((item) => Product.fromJson(item, groceryId: grocery['id'].toString())))
+          .toList();
+      print('AuthProvider: Mapped products: ${_groceryProducts.map((p) => p.name).toList()}');
+      notifyListeners();
+    } catch (e) {
+      print('AuthProvider: Fetch Grocery Products Error: $e');
+      _groceryProducts = [];
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, dynamic>> createGrocery(List<Map<String, dynamic>> items) async {
+    try {
+      final response = await _apiService.createGrocery(items);
+      print('AuthProvider: Grocery Created - Response: $response');
+      await fetchGroceryProducts();
+      notifyListeners();
+      return response;
+    } catch (e) {
+      print('AuthProvider: Create Grocery Error: $e');
+      rethrow;
+    }
+  }
+
+  Future<Map<String, dynamic>> initiateCheckout(String groceryId, {String paymentMethod = 'stripe'}) async {
+    try {
+      final response = await _apiService.initiateCheckout(groceryId, paymentMethod: paymentMethod);
+      print('AuthProvider: Checkout Initiated for Grocery $groceryId with $paymentMethod - Response: $response');
+      notifyListeners();
+      return response; // Returns {client_secret, payment_method} or {payment_link, payment_method}
+    } catch (e) {
+      print('AuthProvider: Initiate Checkout Error: $e');
+      rethrow;
+    }
+  }
+
+  // Restaurant and Order Management
   Future<Map<String, dynamic>> addRestaurant(
     String name,
     String address,
@@ -357,13 +392,11 @@ class AuthProvider with ChangeNotifier {
     try {
       if (_cartItems.isEmpty) throw Exception('Cart is empty');
       if (_token == null) throw Exception('User not authenticated');
-
       final orderData = {
         'items': _cartItems.map((item) => item.toJson()).toList(),
         'total': cartTotal,
         'payment_method': paymentMethod,
       };
-
       final response = await _apiService.placeOrder(orderData);
       print('AuthProvider: Order Initiated with $paymentMethod - Response: $response');
       return response;
@@ -407,6 +440,16 @@ class AuthProvider with ChangeNotifier {
     } catch (e) {
       print('AuthProvider: Poll Order Status Error: $e');
       rethrow;
+    }
+  }
+
+  // Helper method to persist token
+  Future<void> _persistToken(String token) async {
+    if (_isWeb) {
+      html.window.localStorage['auth_token'] = token;
+    } else {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_token', token);
     }
   }
 }

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:geocoding/geocoding.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
   static const String baseUrl = 'https://plus.apexjets.org/api'; // Your Laravel API URL
@@ -10,19 +11,45 @@ class ApiService {
   static String get googleApiKey => dotenv.env['GOOGLE_API_KEY'] ?? 'YOUR_GOOGLE_API_KEY';
   String? _token;
 
-  ApiService();
+  // Singleton pattern
+  static final ApiService _instance = ApiService._internal();
+  factory ApiService() => _instance;
+  ApiService._internal();
 
-  void setToken(String token) {
-    _token = token;
-    print('ApiService: Token set to $_token');
-  }
+  // Getter for token
+  String? get token => _token;
 
+  // Headers with token
   Map<String, String> get headers => {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
         if (_token != null) 'Authorization': 'Bearer $_token',
       };
 
+  // Load token from persistent storage
+  Future<void> loadToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    _token = prefs.getString('auth_token');
+    print('ApiService: Loaded token from storage: $_token');
+  }
+
+  // Set token and persist it
+  Future<void> setToken(String token) async {
+    _token = token;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_token', token);
+    print('ApiService: Token set to $token and persisted');
+  }
+
+  // Clear token
+  Future<void> clearToken() async {
+    _token = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+    print('ApiService: Token cleared');
+  }
+
+  // Handle HTTP response with consistent error handling
   Future<dynamic> _handleResponse(http.Response response, {String action = 'API request'}) async {
     print('$action Response: ${response.statusCode} - ${response.body}');
     if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -31,6 +58,7 @@ class ApiService {
     throw Exception('$action failed: ${response.statusCode} - ${response.body}');
   }
 
+  // Authentication Methods
   Future<Map<String, dynamic>> register(String name, String email, String password, String role) async {
     final body = json.encode({'name': name, 'email': email, 'password': password, 'role': role});
     print('ApiService: Register Request - URL: $baseUrl/register, Headers: $headers, Body: $body');
@@ -53,13 +81,19 @@ class ApiService {
   }
 
   Future<void> logout() async {
+    if (_token == null) {
+      print('ApiService: No token to logout');
+      await clearToken();
+      return;
+    }
     print('ApiService: Logout Request - URL: $baseUrl/logout, Headers: $headers');
     final response = await http.post(Uri.parse('$baseUrl/logout'), headers: headers);
     await _handleResponse(response, action: 'Logout');
-    _token = null;
+    await clearToken();
   }
 
   Future<Map<String, dynamic>> getProfile() async {
+    if (_token == null) throw Exception('No token set. Please log in.');
     print('ApiService: Fetching profile - URL: $baseUrl/profile, Headers: $headers');
     final response = await http.get(Uri.parse('$baseUrl/profile'), headers: headers);
     final data = await _handleResponse(response, action: 'Get Profile');
@@ -68,6 +102,7 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> updateProfile(String name, String email, {String? deliveryLocation}) async {
+    if (_token == null) throw Exception('No token set. Please log in.');
     final body = json.encode({
       'name': name,
       'email': email,
@@ -81,12 +116,14 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> upgradeRole(String newRole) async {
+    if (_token == null) throw Exception('No token set. Please log in.');
     final body = json.encode({'role': newRole});
     print('ApiService: Upgrade Role Request - URL: $baseUrl/upgrade-role, Headers: $headers, Body: $body');
     final response = await http.post(Uri.parse('$baseUrl/upgrade-role'), headers: headers, body: body);
     return await _handleResponse(response, action: 'Upgrade Role');
   }
 
+  // Restaurant Methods
   Future<List<Map<String, dynamic>>> getRestaurantsFromOverpass({
     double south = 4.0,
     double west = 2.0,
@@ -150,39 +187,6 @@ class ApiService {
     return result;
   }
 
-  Future<List<dynamic>> getOrders() async {
-    print('ApiService: Fetching orders - URL: $baseUrl/orders, Headers: $headers');
-    final response = await http.get(Uri.parse('$baseUrl/orders'), headers: headers);
-    final data = await _handleResponse(response, action: 'Get Orders');
-    return data is List ? data : data['orders'] ?? [];
-  }
-
-  Future<Map<String, dynamic>> placeOrder(Map<String, dynamic> orderData) async {
-    final body = json.encode(orderData);
-    print('ApiService: Place Order Request - URL: $baseUrl/orders, Headers: $headers, Body: $body');
-    final response = await http.post(Uri.parse('$baseUrl/orders'), headers: headers, body: body);
-    return await _handleResponse(response, action: 'Place Order');
-  }
-
-  Future<void> updateOrderPaymentStatus(String orderId, String status) async {
-    final body = json.encode({'status': status});
-    print('ApiService: Update Order Payment Status - URL: $baseUrl/orders/$orderId/payment-status, Headers: $headers, Body: $body');
-    final response = await http.put(Uri.parse('$baseUrl/orders/$orderId/payment-status'), headers: headers, body: body);
-    await _handleResponse(response, action: 'Update Order Payment Status');
-  }
-
-  Future<void> cancelOrder(String orderId) async {
-    print('ApiService: Cancel Order Request - URL: $baseUrl/orders/$orderId/cancel, Headers: $headers');
-    final response = await http.post(Uri.parse('$baseUrl/orders/$orderId/cancel'), headers: headers);
-    await _handleResponse(response, action: 'Cancel Order');
-  }
-
-  Future<Map<String, dynamic>> getOrderTracking(String trackingNumber) async {
-    print('ApiService: Get Order Tracking - URL: $baseUrl/orders/track/$trackingNumber, Headers: $headers');
-    final response = await http.get(Uri.parse('$baseUrl/orders/track/$trackingNumber'), headers: headers);
-    return await _handleResponse(response, action: 'Get Order Tracking');
-  }
-
   Future<Map<String, dynamic>> addRestaurant(
     String name,
     String address,
@@ -194,6 +198,7 @@ class ApiService {
     String? image,
     required List<Map<String, dynamic>> menuItems,
   }) async {
+    if (_token == null) throw Exception('No token set. Please log in.');
     final body = json.encode({
       'name': name,
       'address': address,
@@ -211,6 +216,7 @@ class ApiService {
   }
 
   Future<List<dynamic>> getRestaurantsFromApi() async {
+    if (_token == null) throw Exception('No token set. Please log in.');
     print('ApiService: Fetching restaurants - URL: $baseUrl/restaurants, Headers: $headers');
     try {
       final response = await http.get(Uri.parse('$baseUrl/restaurants'), headers: headers);
@@ -226,7 +232,47 @@ class ApiService {
     }
   }
 
+  // Order Management
+  Future<List<dynamic>> getOrders() async {
+    if (_token == null) throw Exception('No token set. Please log in.');
+    print('ApiService: Fetching orders - URL: $baseUrl/orders, Headers: $headers');
+    final response = await http.get(Uri.parse('$baseUrl/orders'), headers: headers);
+    final data = await _handleResponse(response, action: 'Get Orders');
+    return data is List ? data : data['orders'] ?? [];
+  }
+
+  Future<Map<String, dynamic>> placeOrder(Map<String, dynamic> orderData) async {
+    if (_token == null) throw Exception('No token set. Please log in.');
+    final body = json.encode(orderData);
+    print('ApiService: Place Order Request - URL: $baseUrl/orders, Headers: $headers, Body: $body');
+    final response = await http.post(Uri.parse('$baseUrl/orders'), headers: headers, body: body);
+    return await _handleResponse(response, action: 'Place Order');
+  }
+
+  Future<void> updateOrderPaymentStatus(String orderId, String status) async {
+    if (_token == null) throw Exception('No token set. Please log in.');
+    final body = json.encode({'status': status});
+    print('ApiService: Update Order Payment Status - URL: $baseUrl/orders/$orderId/payment-status, Headers: $headers, Body: $body');
+    final response = await http.put(Uri.parse('$baseUrl/orders/$orderId/payment-status'), headers: headers, body: body);
+    await _handleResponse(response, action: 'Update Order Payment Status');
+  }
+
+  Future<void> cancelOrder(String orderId) async {
+    if (_token == null) throw Exception('No token set. Please log in.');
+    print('ApiService: Cancel Order Request - URL: $baseUrl/orders/$orderId/cancel, Headers: $headers');
+    final response = await http.post(Uri.parse('$baseUrl/orders/$orderId/cancel'), headers: headers);
+    await _handleResponse(response, action: 'Cancel Order');
+  }
+
+  Future<Map<String, dynamic>> getOrderTracking(String trackingNumber) async {
+    if (_token == null) throw Exception('No token set. Please log in.');
+    print('ApiService: Get Order Tracking - URL: $baseUrl/orders/track/$trackingNumber, Headers: $headers');
+    final response = await http.get(Uri.parse('$baseUrl/orders/track/$trackingNumber'), headers: headers);
+    return await _handleResponse(response, action: 'Get Order Tracking');
+  }
+
   Future<List<dynamic>> getRestaurantOrders() async {
+    if (_token == null) throw Exception('No token set. Please log in.');
     print('ApiService: Fetching restaurant orders - URL: $baseUrl/restaurant-orders, Headers: $headers');
     final response = await http.get(Uri.parse('$baseUrl/restaurant-orders'), headers: headers);
     final data = await _handleResponse(response, action: 'Get Restaurant Orders');
@@ -234,18 +280,24 @@ class ApiService {
   }
 
   Future<void> updateOrderStatus(String orderId, String status) async {
+    if (_token == null) throw Exception('No token set. Please log in.');
     final body = json.encode({'status': status});
     print('ApiService: Update Order Status - URL: $baseUrl/orders/$orderId/status, Headers: $headers, Body: $body');
     final response = await http.put(Uri.parse('$baseUrl/orders/$orderId/status'), headers: headers, body: body);
     await _handleResponse(response, action: 'Update Order Status');
   }
 
-  // Grocery-related methods
+  // Grocery Methods
   Future<List<dynamic>> getGroceries() async {
     if (_token == null) throw Exception('No token set. Please log in.');
     print('ApiService: Fetching groceries - URL: $baseUrl/grocery, Headers: $headers');
     final response = await http.get(Uri.parse('$baseUrl/grocery'), headers: headers);
-    return await _handleResponse(response, action: 'Get Groceries');
+    final data = await _handleResponse(response, action: 'Get Groceries');
+    return data is List ? data : data['data'] ?? [];
+  }
+
+  Future<List<dynamic>> fetchGroceryProducts() async {
+    return await getGroceries();
   }
 
   Future<Map<String, dynamic>> createGrocery(List<Map<String, dynamic>> items) async {
@@ -256,11 +308,15 @@ class ApiService {
     return await _handleResponse(response, action: 'Create Grocery');
   }
 
-  Future<String> initiateCheckout(String groceryId) async {
+  Future<Map<String, dynamic>> initiateCheckout(String groceryId, {String paymentMethod = 'stripe'}) async {
     if (_token == null) throw Exception('No token set. Please log in.');
-    print('ApiService: Initiate Checkout Request - URL: $baseUrl/grocery/checkout/$groceryId, Headers: $headers');
-    final response = await http.post(Uri.parse('$baseUrl/grocery/checkout/$groceryId'), headers: headers);
-    final data = await _handleResponse(response, action: 'Initiate Checkout');
-    return data['authorization_url'] as String;
+    final body = json.encode({'payment_method': paymentMethod});
+    print('ApiService: Initiate Checkout Request - URL: $baseUrl/grocery/$groceryId/checkout, Headers: $headers, Body: $body');
+    final response = await http.post(
+      Uri.parse('$baseUrl/grocery/$groceryId/checkout'),
+      headers: headers,
+      body: body,
+    );
+    return await _handleResponse(response, action: 'Initiate Checkout');
   }
 }
