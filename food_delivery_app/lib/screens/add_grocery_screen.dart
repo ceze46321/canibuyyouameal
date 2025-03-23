@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart' show primaryColor, textColor, accentColor;
 import '../auth_provider.dart';
-import 'grocery_screen.dart';
 
 class AddGroceryScreen extends StatefulWidget {
   const AddGroceryScreen({super.key});

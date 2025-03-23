@@ -31,8 +31,8 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
   void initState() {
     super.initState();
     _futureRestaurants = _fetchRestaurants();
-    _searchController.addListener(_filterRestaurants);
-    _locationController.addListener(_filterRestaurants);
+    _searchController.addListener(_onFilterChanged);
+    _locationController.addListener(_onFilterChanged);
   }
 
   Future<List<dynamic>> _fetchRestaurants() async {
@@ -52,15 +52,40 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
     }
   }
 
-  void _filterRestaurants() {
-    final query = _searchController.text.toLowerCase().trim();
-    final location = _locationController.text.toLowerCase().trim();
+  Future<void> _onFilterChanged() async {
+    final query = _searchController.text.trim();
+    final location = _locationController.text.trim();
 
+    if (query.isEmpty && location.isEmpty) {
+      setState(() {
+        _filteredRestaurants = _allRestaurants;
+        _currentPage = 1;
+      });
+      return;
+    }
+
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final filtered = await authProvider.getFilteredRestaurants(query, location);
+      if (mounted) {
+        setState(() {
+          _filteredRestaurants = filtered;
+          _currentPage = 1;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error filtering restaurants: $e');
+      // Fallback to client-side filtering
+      _filterRestaurantsClientSide(query, location);
+    }
+  }
+
+  void _filterRestaurantsClientSide(String query, String location) {
     setState(() {
       _filteredRestaurants = _allRestaurants.where((restaurant) {
         final name = (restaurant['name'] ?? '').toString().toLowerCase();
         final address = (restaurant['address'] ?? '').toString().toLowerCase();
-        return name.contains(query) && (location.isEmpty || address.contains(location));
+        return name.contains(query.toLowerCase()) && (location.isEmpty || address.contains(location.toLowerCase()));
       }).toList();
       _currentPage = 1;
     });
@@ -73,13 +98,13 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
   }
 
   void _onItemTapped(int index) {
-    if (index == _selectedIndex) return; // Avoid redundant navigation
+    if (index == _selectedIndex) return;
 
     setState(() => _selectedIndex = index);
 
     final routes = {
       0: '/home',
-      1: '/restaurants', // Current screen, no navigation needed
+      1: '/restaurants',
       2: '/orders',
       3: '/profile',
       4: '/restaurant-owner',
@@ -110,11 +135,7 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
         ),
         title: Text(
           'Restaurants',
-          style: GoogleFonts.poppins(
-            fontSize: 22,
-            fontWeight: FontWeight.w600,
-            color: doorDashWhite,
-          ),
+          style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w600, color: doorDashWhite),
         ),
         centerTitle: true,
         flexibleSpace: Container(
@@ -199,54 +220,28 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.home),
-            label: 'Home',
-            tooltip: 'Go to Home',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.restaurant),
-            label: 'Restaurants',
-            tooltip: 'Restaurants',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.shopping_cart),
-            label: 'Orders',
-            tooltip: 'View Orders',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person),
-            label: 'Profile',
-            tooltip: 'Your Profile',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.store),
-            label: 'Owner',
-            tooltip: 'Restaurant Owner Dashboard',
-          ),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home', tooltip: 'Go to Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.restaurant), label: 'Restaurants', tooltip: 'Restaurants'),
+          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Orders', tooltip: 'View Orders'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile', tooltip: 'Your Profile'),
+          BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Owner', tooltip: 'Restaurant Owner Dashboard'),
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: doorDashRed,
         unselectedItemColor: doorDashGrey.withOpacity(0.6),
         backgroundColor: doorDashWhite,
-        elevation: 12, // Increased elevation for a more pronounced shadow
+        elevation: 12,
         type: BottomNavigationBarType.fixed,
-        selectedLabelStyle: GoogleFonts.poppins(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
-        unselectedLabelStyle: GoogleFonts.poppins(
-          fontSize: 12,
-          fontWeight: FontWeight.w400,
-        ),
-        showUnselectedLabels: true, // Ensure all labels are visible
+        selectedLabelStyle: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600),
+        unselectedLabelStyle: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w400),
+        showUnselectedLabels: true,
         onTap: _onItemTapped,
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => setState(() => _futureRestaurants = _fetchRestaurants()),
         backgroundColor: doorDashRed,
-        child: const Icon(Icons.refresh, color: doorDashWhite),
         tooltip: 'Refresh Restaurants',
+        child: const Icon(Icons.refresh, color: doorDashWhite),
       ),
     );
   }
@@ -270,11 +265,7 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
         color: doorDashWhite,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
+          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2)),
         ],
       ),
       child: TextField(
@@ -289,10 +280,7 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
                   onPressed: () => controller.clear(),
                 )
               : null,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
           contentPadding: const EdgeInsets.symmetric(vertical: 14),
           filled: true,
           fillColor: doorDashWhite,
@@ -317,7 +305,7 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
   }
 
   Widget _buildRestaurantCard(dynamic restaurant) {
-    final menus = (restaurant['menus'] as List<dynamic>?) ?? [];
+    final menus = (restaurant['menu_items'] ?? restaurant['menus'] as List<dynamic>?) ?? [];
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
@@ -328,11 +316,7 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
           color: doorDashWhite,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
+            BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8, offset: const Offset(0, 2)),
           ],
         ),
         child: Column(
@@ -358,9 +342,7 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
 
   Widget _buildRestaurantImage(String? imageUrl) {
     debugPrint('Loading image from: $imageUrl');
-    final validUrl = imageUrl != null && imageUrl.trim().isNotEmpty
-        ? imageUrl
-        : 'https://via.placeholder.com/300';
+    final validUrl = imageUrl != null && imageUrl.trim().isNotEmpty ? imageUrl : 'https://via.placeholder.com/300';
 
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
@@ -429,7 +411,7 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
   Widget _buildMenuItem(dynamic item, AuthProvider auth, BuildContext context) {
     final itemName = item['name'] ?? 'Unnamed';
     final itemPrice = (item['price'] as num?)?.toDouble() ?? 0.0;
-    final restaurantName = item['restaurantName'] ?? 'Unknown';
+    final restaurantName = item['restaurant_name'] ?? 'Unknown';
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -446,7 +428,7 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 Text(
-                  '\$${itemPrice.toStringAsFixed(2)}',
+                  '₦${itemPrice.toStringAsFixed(2)}',
                   style: GoogleFonts.poppins(fontSize: 12, color: doorDashRed),
                 ),
               ],

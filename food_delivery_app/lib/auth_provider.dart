@@ -4,6 +4,7 @@ import 'package:chiw_express/models/customer_review.dart';
 import 'package:chiw_express/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'package:flutter/foundation.dart'; // Add this for debugPrint
 import 'dart:html' as html if (dart.library.html) 'dart:html';
 
 class AuthProvider with ChangeNotifier {
@@ -15,7 +16,7 @@ class AuthProvider with ChangeNotifier {
   String? _deliveryLocation;
   String? _phone;
   String? _vehicle;
-  List<CartItem> _cartItems = [];
+  final List<CartItem> _cartItems = [];
   List<Map<String, dynamic>> _groceryProducts = [];
   List<Map<String, dynamic>> _userGroceries = [];
   bool _isLoadingGroceries = false;
@@ -358,12 +359,21 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+Future<List<dynamic>> getFilteredGroceries(String name, String location) async {
+  try {
+    final response = await _apiService.getFilteredGroceries(name, location);
+    return response; // Already a List<dynamic> from ApiService
+  } catch (e) {
+    debugPrint('Get filtered groceries failed: $e');
+    rethrow;
+  }
+}
   // Grocery Product Management (unchanged)
   Future<List<Map<String, dynamic>>> fetchGroceryProducts() async {
     try {
       final productsData = await _apiService.fetchGroceryProducts();
       debugPrint('Raw grocery products data: $productsData');
-      if (productsData == null || productsData.isEmpty) {
+      if (productsData.isEmpty) {
         _groceryProducts = [];
       } else {
         _groceryProducts = List<Map<String, dynamic>>.from(productsData);
@@ -480,6 +490,16 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+Future<List<dynamic>> getFilteredRestaurants(String name, String location) async {
+  try {
+    final response = await _apiService.getFilteredRestaurants(name, location);
+    debugPrint('Filtered restaurants response: $response');
+    return response; // Now guaranteed to be List<dynamic> from ApiService
+  } catch (e) {
+    debugPrint('Get filtered restaurants failed: $e');
+    rethrow;
+  }
+}
   Future<List<dynamic>> getRestaurantOrders() async {
     try {
       return await _apiService.getRestaurantOrders();
@@ -585,7 +605,7 @@ class AuthProvider with ChangeNotifier {
 
     try {
       final response = await _apiService.fetchCustomerReviews();
-      _reviews = (response as List<dynamic>).map((json) => CustomerReview.fromJson(json)).toList();
+      _reviews = (response).map((json) => CustomerReview.fromJson(json)).toList();
     } catch (e) {
       debugPrint('Fetch customer reviews failed: $e');
       _reviews = [];

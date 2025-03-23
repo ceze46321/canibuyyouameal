@@ -225,11 +225,11 @@ class _CustomerReviewScreenState extends State<CustomerReviewScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
                                 children: List.generate(
                                   review.rating,
                                   (i) => const Icon(Icons.star, color: Colors.amber, size: 18),
                                 ),
-                                mainAxisAlignment: MainAxisAlignment.start,
                               ),
                               const SizedBox(height: 8),
                               Text(
@@ -294,8 +294,8 @@ class _CustomerReviewScreenState extends State<CustomerReviewScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showWriteReviewDialog(context),
         backgroundColor: accentColor,
-        child: const Icon(Icons.edit, color: Colors.white),
         tooltip: 'Write a Review',
+        child: const Icon(Icons.edit, color: Colors.white),
       ),
     );
   }

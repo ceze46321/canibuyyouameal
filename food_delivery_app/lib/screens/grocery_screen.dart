@@ -8,7 +8,6 @@ import 'package:uni_links/uni_links.dart';
 import '../main.dart' show primaryColor, textColor, accentColor;
 import '../auth_provider.dart';
 import 'restaurant_screen.dart';
-import 'add_grocery_screen.dart';
 import 'create_grocery_product_screen.dart';
 
 class GroceryScreen extends StatefulWidget {
@@ -22,8 +21,10 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
   late AnimationController _animationController;
   int _selectedIndex = 2;
   List<Map<String, dynamic>> cart = [];
-  String searchQuery = '';
-  String selectedLocation = 'All';
+  final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _locationController = TextEditingController();
+  List<Map<String, dynamic>> _allGroceries = [];
+  List<Map<String, dynamic>> _filteredGroceries = [];
   StreamSubscription? _sub;
   bool _isLoading = true;
 
@@ -40,14 +41,22 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
       duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
     _fetchGroceries();
-    _initDeepLinkListener();
+    _initDeepLinkListener(); // Define this method below
+    _searchController.addListener(_onFilterChanged);
+    _locationController.addListener(_onFilterChanged);
   }
 
   Future<void> _fetchGroceries() async {
     setState(() => _isLoading = true);
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     try {
-      await authProvider.fetchGroceryProducts();
+      final groceries = await authProvider.fetchGroceryProducts();
+      if (mounted) {
+        setState(() {
+          _allGroceries = List<Map<String, dynamic>>.from(groceries); // Ensure type safety
+          _filteredGroceries = _flattenAndFilterGroceries(_allGroceries);
+        });
+      }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error fetching groceries: $e'), backgroundColor: Colors.redAccent),
@@ -57,26 +66,19 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
     }
   }
 
-  @override
-  void dispose() {
-    _sub?.cancel();
-    _animationController.dispose();
-    super.dispose();
-  }
-
-  void _initDeepLinkListener() async {
+  Future<void> _initDeepLinkListener() async {
+    // Handle initial deep link
     final initialLink = await getInitialLink();
     if (initialLink != null) {
       debugPrint('Initial deep link: $initialLink');
       _handleDeepLink(initialLink);
     }
 
+    // Listen for deep links during runtime
     _sub = linkStream.listen((String? link) {
       if (link != null) {
         debugPrint('Received deep link: $link');
         _handleDeepLink(link);
-      } else {
-        debugPrint('Received null deep link');
       }
     }, onError: (err) {
       debugPrint('Deep link error: $err');
@@ -89,45 +91,80 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
   void _handleDeepLink(String link) {
     final uri = Uri.parse(link);
     final status = uri.queryParameters['status'];
-    final message = uri.queryParameters['message'];
+    if (status == 'completed') {
+      setState(() => cart.clear());
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Payment successful!'), backgroundColor: doorDashRed),
+      );
+    }
+  }
 
-    debugPrint('Handling deep link - Status: $status, Message: $message');
+  Future<void> _onFilterChanged() async {
+    final query = _searchController.text.trim();
+    final location = _locationController.text.trim();
 
-    if (status != null) {
-      if (status == 'completed') {
-        setState(() => cart.clear());
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Payment successful!'), backgroundColor: doorDashRed),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Payment $status${message != null ? ': $message' : ''}'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
+    if (query.isEmpty && location.isEmpty) {
+      setState(() {
+        _filteredGroceries = _flattenAndFilterGroceries(_allGroceries);
+      });
+      return;
+    }
+
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final filtered = await authProvider.getFilteredGroceries(query, location);
+      if (mounted) {
+        setState(() {
+          _filteredGroceries = _flattenAndFilterGroceries(List<Map<String, dynamic>>.from(filtered)); // Type cast
+        });
       }
-    } else {
-      debugPrint('No payment status in deep link, skipping SnackBar');
+    } catch (e) {
+      debugPrint('Error filtering groceries: $e');
+      _filterGroceriesClientSide(query, location);
     }
   }
 
   List<Map<String, dynamic>> _flattenAndFilterGroceries(List<Map<String, dynamic>> groceries) {
     final allItems = groceries.expand((grocery) {
       final items = grocery['items'] as List<dynamic>? ?? [];
-      return items.map((item) => {
+      return items.map((item) => ({
             'id': grocery['id']?.toString() ?? 'unknown',
             'name': item['name']?.toString() ?? 'Unnamed',
             'stock_quantity': item['quantity'] ?? 1,
             'price': (item['price'] as num?)?.toDouble() ?? 0.0,
             'image': item['image']?.toString(),
-          });
+            'location': grocery['location']?.toString() ?? '',
+          }));
     }).toList();
 
+    final query = _searchController.text.toLowerCase().trim();
+    final location = _locationController.text.toLowerCase().trim();
+
     return allItems.where((item) {
-      final matchesName = (item['name'] ?? '').toLowerCase().contains(searchQuery.toLowerCase());
-      return matchesName;
+      final matchesName = (item['name'] ?? '').toLowerCase().contains(query);
+      final matchesLocation = location.isEmpty || (item['location'] ?? '').toLowerCase().contains(location);
+      return matchesName && matchesLocation;
     }).toList();
+  }
+
+  void _filterGroceriesClientSide(String query, String location) {
+    setState(() {
+      _filteredGroceries = _allGroceries.expand((grocery) {
+        final items = grocery['items'] as List<dynamic>? ?? [];
+        return items.map((item) => ({
+              'id': grocery['id']?.toString() ?? 'unknown',
+              'name': item['name']?.toString() ?? 'Unnamed',
+              'stock_quantity': item['quantity'] ?? 1,
+              'price': (item['price'] as num?)?.toDouble() ?? 0.0,
+              'image': item['image']?.toString(),
+              'location': grocery['location']?.toString() ?? '',
+            }));
+      }).where((item) {
+        final matchesName = (item['name'] ?? '').toLowerCase().contains(query.toLowerCase());
+        final matchesLocation = location.isEmpty || (item['location'] ?? '').toLowerCase().contains(location.toLowerCase());
+        return matchesName && matchesLocation;
+      }).toList();
+    });
   }
 
   void _addToCart(Map<String, dynamic> item) {
@@ -336,12 +373,18 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
   }
 
   @override
+  void dispose() {
+    _sub?.cancel();
+    _animationController.dispose();
+    _searchController.dispose();
+    _locationController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
-        final groceries = authProvider.groceryProducts;
-        final filteredProducts = _flattenAndFilterGroceries(groceries);
-
         return Scaffold(
           backgroundColor: doorDashLightGrey,
           appBar: AppBar(
@@ -368,10 +411,17 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
                 child: Column(
                   children: [
                     TextField(
+                      controller: _searchController,
                       decoration: InputDecoration(
-                        hintText: 'Search groceries...',
+                        hintText: 'Search by name...',
                         hintStyle: GoogleFonts.poppins(color: doorDashGrey),
                         prefixIcon: const Icon(Icons.search, color: doorDashRed),
+                        suffixIcon: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, color: doorDashRed),
+                                onPressed: () => _searchController.clear(),
+                              )
+                            : null,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
@@ -379,14 +429,20 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
                         filled: true,
                         fillColor: Colors.white,
                       ),
-                      onChanged: (value) {
-                        setState(() => searchQuery = value);
-                      },
                     ),
                     const SizedBox(height: 12),
-                    DropdownButtonFormField<String>(
-                      value: selectedLocation,
+                    TextField(
+                      controller: _locationController,
                       decoration: InputDecoration(
+                        hintText: 'Filter by location...',
+                        hintStyle: GoogleFonts.poppins(color: doorDashGrey),
+                        prefixIcon: const Icon(Icons.location_on, color: doorDashRed),
+                        suffixIcon: _locationController.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, color: doorDashRed),
+                                onPressed: () => _locationController.clear(),
+                              )
+                            : null,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide.none,
@@ -394,12 +450,6 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
                         filled: true,
                         fillColor: Colors.white,
                       ),
-                      items: ['All'].map((location) {
-                        return DropdownMenuItem(value: location, child: Text(location, style: GoogleFonts.poppins(color: textColor)));
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() => selectedLocation = value!);
-                      },
                     ),
                   ],
                 ),
@@ -409,14 +459,14 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
                     ? const Center(child: CircularProgressIndicator(color: doorDashRed))
                     : !authProvider.isLoggedIn
                         ? Center(child: Text('Please log in to view groceries', style: GoogleFonts.poppins(color: doorDashGrey)))
-                        : groceries.isEmpty
+                        : _allGroceries.isEmpty
                             ? Center(
                                 child: Text(
                                   'No groceries available',
                                   style: GoogleFonts.poppins(fontSize: 20, color: doorDashGrey),
                                 ),
                               )
-                            : filteredProducts.isEmpty
+                            : _filteredGroceries.isEmpty
                                 ? Center(
                                     child: Text(
                                       'No groceries match your search',
@@ -431,9 +481,9 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
                                       mainAxisSpacing: 16,
                                       childAspectRatio: 0.7,
                                     ),
-                                    itemCount: filteredProducts.length,
+                                    itemCount: _filteredGroceries.length,
                                     itemBuilder: (context, index) {
-                                      final product = filteredProducts[index];
+                                      final product = _filteredGroceries[index];
                                       return _buildGroceryItem(product);
                                     },
                                   ),

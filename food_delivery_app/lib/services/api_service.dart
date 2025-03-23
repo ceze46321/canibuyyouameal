@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:geocoding/geocoding.dart';
+import 'package:flutter/foundation.dart'; // Add this for debugPrint
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:html' as html if (dart.library.html) 'dart:html';
 
@@ -232,6 +233,20 @@ class ApiService {
     return await post('/restaurants', body);
   }
 
+Future<List<dynamic>> getFilteredGroceries(String name, String location) async {
+  final queryParams = <String, String>{};
+  if (name.isNotEmpty) queryParams['name'] = name;
+  if (location.isNotEmpty) queryParams['location'] = location;
+
+  final uri = Uri.parse('$baseUrl/grocery/filter').replace(queryParameters: queryParams);
+  final data = await get('/grocery/filter?${uri.query}');
+  debugPrint('Raw response from /grocery/filter: $data');
+
+  if (data is List) return data;
+  if (data is Map) return data['groceries'] ?? data['data'] ?? [];
+  debugPrint('Unexpected response type: ${data.runtimeType}, returning empty list');
+  return [];
+}
   Future<List<dynamic>> getRestaurantsFromApi() async {
     final data = await get('/restaurants');
     return data is List ? data : data['restaurants'] ?? data['data'] ?? [];
@@ -284,6 +299,20 @@ class ApiService {
     return await getGroceries();
   }
 
+Future<List<dynamic>> getFilteredRestaurants(String name, String location) async {
+    final queryParams = <String, String>{};
+    if (name.isNotEmpty) queryParams['name'] = name;
+    if (location.isNotEmpty) queryParams['location'] = location;
+
+    final uri = Uri.parse('$baseUrl/restaurants/filter').replace(queryParameters: queryParams);
+    final data = await get('/restaurants/filter?${uri.query}');
+    debugPrint('Raw response from /restaurants/filter: $data');
+
+    if (data is List) return data;
+    if (data is Map) return data['restaurants'] ?? data['data'] ?? [];
+    debugPrint('Unexpected response type: ${data.runtimeType}, returning empty list');
+    return []; // Fallback for unexpected types like String
+  }
   Future<Map<String, dynamic>> createGrocery(List<Map<String, dynamic>> items) async {
     final totalAmount = items.fold(0.0, (sum, item) => sum + (item['quantity'] * item['price']));
     final body = {

@@ -247,8 +247,8 @@ class _OrderScreenState extends State<OrderScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: isLoading ? null : _fetchOrders,
         backgroundColor: doorDashRed,
-        child: const Icon(Icons.refresh, color: doorDashWhite),
         tooltip: 'Refresh Orders',
+        child: const Icon(Icons.refresh, color: doorDashWhite),
       ),
     );
   }
@@ -305,7 +305,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Total: \N${order['total'] ?? 'N/A'}',
+                    'Total: N${order['total'] ?? 'N/A'}',
                     style: GoogleFonts.poppins(fontSize: 16, color: textColor),
                   ),
                   Text(

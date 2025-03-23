@@ -487,8 +487,8 @@ Full policy at chiwexpress.com/privacy.
       floatingActionButton: FloatingActionButton(
         onPressed: () => Navigator.pushNamed(context, '/restaurants'),
         backgroundColor: const Color(0xFFEF2A39),
-        child: const Icon(Icons.fastfood, color: Colors.white),
         tooltip: 'Order Now',
+        child: const Icon(Icons.fastfood, color: Colors.white),
       ),
     );
   }
