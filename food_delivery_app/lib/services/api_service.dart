@@ -28,7 +28,7 @@ class ApiService {
         if (_token != null) 'Authorization': 'Bearer $_token',
       };
 
-  // Load token from persistent storage (Updated for web support)
+  // Load token from persistent storage
   Future<void> loadToken() async {
     if (_isWeb) {
       _token = html.window.localStorage['auth_token'];
@@ -38,7 +38,7 @@ class ApiService {
     }
   }
 
-  // Set token and persist it (Updated for web support)
+  // Set token and persist it
   Future<void> setToken(String token) async {
     _token = token;
     if (_isWeb) {
@@ -49,7 +49,7 @@ class ApiService {
     }
   }
 
-  // Clear token (Updated for web support)
+  // Clear token
   Future<void> clearToken() async {
     _token = null;
     if (_isWeb) {
@@ -307,9 +307,13 @@ class ApiService {
     return await post('/dasher/orders/$orderId/accept', {});
   }
 
-  // New Method: Fetch Customer Reviews
+  // Review Methods
   Future<List<dynamic>> fetchCustomerReviews() async {
     final data = await get('/customer-reviews');
     return data is List ? data : data['reviews'] ?? data['data'] ?? [];
+  }
+
+  Future<Map<String, dynamic>> submitCustomerReview(Map<String, dynamic> reviewData) async {
+    return await post('/customer-reviews', reviewData);
   }
 }

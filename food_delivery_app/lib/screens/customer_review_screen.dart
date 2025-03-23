@@ -12,12 +12,11 @@ class CustomerReviewScreen extends StatefulWidget {
 }
 
 class _CustomerReviewScreenState extends State<CustomerReviewScreen> {
-  int _selectedIndex = 0; // Default to Home for consistency, adjust as needed
+  int _selectedIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    // Fetch reviews when the screen loads
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     if (!authProvider.isLoadingReviews && authProvider.reviews.isEmpty) {
       authProvider.fetchCustomerReviews();
@@ -39,6 +38,109 @@ class _CustomerReviewScreenState extends State<CustomerReviewScreen> {
     }
   }
 
+  void _showWriteReviewDialog(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    int rating = 0;
+    final commentController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(
+            'Write a Review',
+            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Rating',
+                style: GoogleFonts.poppins(fontSize: 14, color: textColor),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.start,
+                children: List.generate(5, (index) {
+                  return IconButton(
+                    icon: Icon(
+                      index < rating ? Icons.star : Icons.star_border,
+                      color: Colors.amber,
+                    ),
+                    onPressed: () {
+                      setState(() => rating = index + 1);
+                    },
+                  );
+                }),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: commentController,
+                decoration: InputDecoration(
+                  labelText: 'Your Comment',
+                  labelStyle: GoogleFonts.poppins(color: textColor.withOpacity(0.7)),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: primaryColor),
+                  ),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text('Cancel', style: GoogleFonts.poppins(color: Colors.grey)),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (rating > 0) {
+                  try {
+                    await authProvider.submitReview(
+                      rating,
+                      commentController.text.isEmpty ? null : commentController.text,
+                      // orderId: 123, // Uncomment and set if tied to an order
+                    );
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Review submitted!', style: GoogleFonts.poppins()),
+                        backgroundColor: accentColor,
+                      ),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to submit review: $e', style: GoogleFonts.poppins()),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Please provide a rating', style: GoogleFonts.poppins()),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentColor,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: Text('Submit', style: GoogleFonts.poppins(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
@@ -53,9 +155,25 @@ class _CustomerReviewScreenState extends State<CustomerReviewScreen> {
             color: Colors.white,
           ),
         ),
-        backgroundColor: primaryColor, // Warm Coral from main.dart
+        backgroundColor: primaryColor,
         elevation: 0,
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: () {
+              authProvider.fetchCustomerReviews();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Refreshing reviews...', style: GoogleFonts.poppins()),
+                  backgroundColor: accentColor,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+            tooltip: 'Refresh Reviews',
+          ),
+        ],
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -90,7 +208,7 @@ class _CustomerReviewScreenState extends State<CustomerReviewScreen> {
                       crossAxisCount: 2,
                       crossAxisSpacing: 12.0,
                       mainAxisSpacing: 12.0,
-                      childAspectRatio: 0.8, // Slightly taller cards
+                      childAspectRatio: 0.8,
                     ),
                     itemCount: authProvider.reviews.length,
                     itemBuilder: (context, index) {
@@ -164,7 +282,7 @@ class _CustomerReviewScreenState extends State<CustomerReviewScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.directions_bike), label: 'Dasher'),
         ],
         currentIndex: _selectedIndex,
-        selectedItemColor: accentColor, // DoorDash red from main.dart
+        selectedItemColor: accentColor,
         unselectedItemColor: textColor.withOpacity(0.6),
         onTap: _onItemTapped,
         type: BottomNavigationBarType.fixed,
@@ -174,19 +292,10 @@ class _CustomerReviewScreenState extends State<CustomerReviewScreen> {
         unselectedLabelStyle: GoogleFonts.poppins(),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          authProvider.fetchCustomerReviews(); // Refresh reviews
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Refreshing reviews...', style: GoogleFonts.poppins()),
-              backgroundColor: accentColor,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        },
+        onPressed: () => _showWriteReviewDialog(context),
         backgroundColor: accentColor,
-        child: const Icon(Icons.refresh, color: Colors.white),
-        tooltip: 'Refresh Reviews',
+        child: const Icon(Icons.edit, color: Colors.white),
+        tooltip: 'Write a Review',
       ),
     );
   }

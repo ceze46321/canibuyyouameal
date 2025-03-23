@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:chiw_express/models/cart.dart';
-import 'package:chiw_express/models/customer_review.dart'; // Import the new model
+import 'package:chiw_express/models/customer_review.dart';
 import 'package:chiw_express/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -19,8 +19,8 @@ class AuthProvider with ChangeNotifier {
   List<Map<String, dynamic>> _groceryProducts = [];
   List<Map<String, dynamic>> _userGroceries = [];
   bool _isLoadingGroceries = false;
-  List<CustomerReview> _reviews = []; // New field for reviews
-  bool _isLoadingReviews = false; // New field for loading state
+  List<CustomerReview> _reviews = [];
+  bool _isLoadingReviews = false;
   static const bool _isWeb = identical(0, 0.0);
 
   // Getters
@@ -38,8 +38,8 @@ class AuthProvider with ChangeNotifier {
   List<Map<String, dynamic>> get groceryProducts => _groceryProducts;
   List<Map<String, dynamic>> get userGroceries => _userGroceries;
   bool get isLoadingGroceries => _isLoadingGroceries;
-  List<CustomerReview> get reviews => _reviews; // New getter
-  bool get isLoadingReviews => _isLoadingReviews; // New getter
+  List<CustomerReview> get reviews => _reviews;
+  bool get isLoadingReviews => _isLoadingReviews;
   ApiService get apiService => _apiService;
 
   AuthProvider() {
@@ -95,7 +95,7 @@ class AuthProvider with ChangeNotifier {
       debugPrint('Error fetching user groceries: $e');
     }
     try {
-      await fetchCustomerReviews(); // Fetch reviews on login
+      await fetchCustomerReviews();
       debugPrint('Customer reviews fetched successfully');
     } catch (e) {
       debugPrint('Error fetching customer reviews: $e');
@@ -242,7 +242,7 @@ class AuthProvider with ChangeNotifier {
       _cartItems.clear();
       _groceryProducts.clear();
       _userGroceries.clear();
-      _reviews.clear(); // Clear reviews on logout
+      _reviews.clear();
       if (_isWeb) {
         html.window.localStorage.remove('auth_token');
         html.window.localStorage.remove('name');
@@ -567,14 +567,14 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // New Method: Fetch Customer Reviews
+  // Fetch Customer Reviews
   Future<void> fetchCustomerReviews() async {
     if (!isLoggedIn) return;
     _isLoadingReviews = true;
     notifyListeners();
 
     try {
-      final response = await _apiService.fetchCustomerReviews(); // Add this method to ApiService
+      final response = await _apiService.fetchCustomerReviews();
       _reviews = (response as List<dynamic>).map((json) => CustomerReview.fromJson(json)).toList();
     } catch (e) {
       debugPrint('Fetch customer reviews failed: $e');
@@ -582,6 +582,25 @@ class AuthProvider with ChangeNotifier {
     } finally {
       _isLoadingReviews = false;
       notifyListeners();
+    }
+  }
+
+  // New Method: Submit Customer Review
+  Future<void> submitReview(int rating, String? comment, {int? orderId}) async {
+    if (!isLoggedIn) throw Exception('User not authenticated');
+    try {
+      final reviewData = {
+        'rating': rating,
+        'comment': comment,
+        if (orderId != null) 'order_id': orderId, // Optional: Tie review to an order
+      };
+      final response = await _apiService.submitCustomerReview(reviewData);
+      final newReview = CustomerReview.fromJson(response);
+      _reviews.add(newReview);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Submit review failed: $e');
+      rethrow;
     }
   }
 
