@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:chiw_express/models/cart.dart';
+import 'package:chiw_express/models/customer_review.dart'; // Import the new model
 import 'package:chiw_express/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -18,6 +19,8 @@ class AuthProvider with ChangeNotifier {
   List<Map<String, dynamic>> _groceryProducts = [];
   List<Map<String, dynamic>> _userGroceries = [];
   bool _isLoadingGroceries = false;
+  List<CustomerReview> _reviews = []; // New field for reviews
+  bool _isLoadingReviews = false; // New field for loading state
   static const bool _isWeb = identical(0, 0.0);
 
   // Getters
@@ -35,6 +38,8 @@ class AuthProvider with ChangeNotifier {
   List<Map<String, dynamic>> get groceryProducts => _groceryProducts;
   List<Map<String, dynamic>> get userGroceries => _userGroceries;
   bool get isLoadingGroceries => _isLoadingGroceries;
+  List<CustomerReview> get reviews => _reviews; // New getter
+  bool get isLoadingReviews => _isLoadingReviews; // New getter
   ApiService get apiService => _apiService;
 
   AuthProvider() {
@@ -48,7 +53,7 @@ class AuthProvider with ChangeNotifier {
       _name = html.window.localStorage['name'];
       _email = html.window.localStorage['email'];
       _role = html.window.localStorage['role'];
-      _deliveryLocation = html.window.localStorage['delivery_location']; // Load deliveryLocation
+      _deliveryLocation = html.window.localStorage['delivery_location'];
       _phone = html.window.localStorage['phone'];
       _vehicle = html.window.localStorage['vehicle'];
     } else {
@@ -57,7 +62,7 @@ class AuthProvider with ChangeNotifier {
       _name = prefs.getString('name');
       _email = prefs.getString('email');
       _role = prefs.getString('role');
-      _deliveryLocation = prefs.getString('delivery_location'); // Load deliveryLocation
+      _deliveryLocation = prefs.getString('delivery_location');
       _phone = prefs.getString('phone');
       _vehicle = prefs.getString('vehicle');
     }
@@ -88,6 +93,12 @@ class AuthProvider with ChangeNotifier {
       debugPrint('User groceries fetched successfully');
     } catch (e) {
       debugPrint('Error fetching user groceries: $e');
+    }
+    try {
+      await fetchCustomerReviews(); // Fetch reviews on login
+      debugPrint('Customer reviews fetched successfully');
+    } catch (e) {
+      debugPrint('Error fetching customer reviews: $e');
     }
     notifyListeners();
   }
@@ -154,7 +165,7 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Authentication Methods
+  // Authentication Methods (unchanged)
   Future<Map<String, dynamic>> register(String name, String email, String password, String role) async {
     try {
       final response = await _apiService.register(name, email, password, role);
@@ -231,12 +242,13 @@ class AuthProvider with ChangeNotifier {
       _cartItems.clear();
       _groceryProducts.clear();
       _userGroceries.clear();
+      _reviews.clear(); // Clear reviews on logout
       if (_isWeb) {
         html.window.localStorage.remove('auth_token');
         html.window.localStorage.remove('name');
         html.window.localStorage.remove('email');
         html.window.localStorage.remove('role');
-        html.window.localStorage.remove('delivery_location'); // Clear deliveryLocation
+        html.window.localStorage.remove('delivery_location');
         html.window.localStorage.remove('phone');
         html.window.localStorage.remove('vehicle');
       } else {
@@ -245,7 +257,7 @@ class AuthProvider with ChangeNotifier {
         await prefs.remove('name');
         await prefs.remove('email');
         await prefs.remove('role');
-        await prefs.remove('delivery_location'); // Clear deliveryLocation
+        await prefs.remove('delivery_location');
         await prefs.remove('phone');
         await prefs.remove('vehicle');
       }
@@ -311,7 +323,7 @@ class AuthProvider with ChangeNotifier {
       _phone = response['user']['phone'];
       _vehicle = response['user']['vehicle'];
       _role = response['user']['role'];
-      _deliveryLocation = response['user']['delivery_location']; // Ensure deliveryLocation is updated
+      _deliveryLocation = response['user']['delivery_location'];
       await _persistToken(_token!, name: _name, email: _email, role: _role, deliveryLocation: _deliveryLocation, phone: _phone, vehicle: _vehicle);
       notifyListeners();
     } catch (e) {
@@ -552,6 +564,24 @@ class AuthProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('Poll order status failed: $e');
       rethrow;
+    }
+  }
+
+  // New Method: Fetch Customer Reviews
+  Future<void> fetchCustomerReviews() async {
+    if (!isLoggedIn) return;
+    _isLoadingReviews = true;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.fetchCustomerReviews(); // Add this method to ApiService
+      _reviews = (response as List<dynamic>).map((json) => CustomerReview.fromJson(json)).toList();
+    } catch (e) {
+      debugPrint('Fetch customer reviews failed: $e');
+      _reviews = [];
+    } finally {
+      _isLoadingReviews = false;
+      notifyListeners();
     }
   }
 

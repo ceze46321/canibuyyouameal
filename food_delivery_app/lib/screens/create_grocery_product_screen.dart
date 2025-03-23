@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../main.dart' show primaryColor, textColor, accentColor;
 import '../auth_provider.dart';
+import 'restaurant_screen.dart';
 
 class CreateGroceryProductScreen extends StatefulWidget {
   const CreateGroceryProductScreen({super.key});
@@ -24,6 +25,7 @@ class _CreateGroceryProductScreenState extends State<CreateGroceryProductScreen>
   final _imageUrlController = TextEditingController();
   bool _isSubmitting = false;
   List<Map<String, dynamic>> _groceryProducts = [];
+  int _selectedIndex = 2; // Default to Groceries tab (matches GroceryScreen)
 
   @override
   void initState() {
@@ -96,7 +98,7 @@ class _CreateGroceryProductScreenState extends State<CreateGroceryProductScreen>
         ],
       };
       print('Submitting payload: $payload');
-      await authProvider.createGrocery(payload['items'] as List<Map<String, dynamic>>); // Use createGrocery
+      await authProvider.createGrocery(payload['items'] as List<Map<String, dynamic>>);
       await _fetchGroceryProducts(); // Refresh list after adding
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -172,6 +174,25 @@ class _CreateGroceryProductScreenState extends State<CreateGroceryProductScreen>
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       );
+    }
+  }
+
+  void _onItemTapped(int index) {
+    setState(() => _selectedIndex = index);
+    final routes = {
+      0: '/home',
+      1: '/restaurants',
+      2: '/groceries',
+      3: '/orders',
+      4: '/profile',
+      5: '/restaurant-owner',
+    };
+    if (index != 2 && routes.containsKey(index)) { // 2 is Groceries, so stay if selected
+      if (index == 1) {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RestaurantScreen()));
+      } else {
+        Navigator.pushReplacementNamed(context, routes[index]!);
+      }
     }
   }
 
@@ -297,6 +318,24 @@ class _CreateGroceryProductScreenState extends State<CreateGroceryProductScreen>
         icon: const Icon(Icons.add, color: doorDashWhite),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      bottomNavigationBar: BottomNavigationBar(
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(icon: Icon(Icons.restaurant), label: 'Restaurants'),
+          BottomNavigationBarItem(icon: Icon(Icons.local_grocery_store), label: 'Groceries'),
+          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Orders'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Owner'),
+        ],
+        currentIndex: _selectedIndex,
+        selectedItemColor: doorDashRed,
+        unselectedItemColor: doorDashGrey,
+        backgroundColor: Colors.white,
+        type: BottomNavigationBarType.fixed,
+        selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        unselectedLabelStyle: GoogleFonts.poppins(),
+        onTap: _onItemTapped,
+      ),
     );
   }
 

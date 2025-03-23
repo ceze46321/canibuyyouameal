@@ -7,6 +7,7 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'add_grocery_screen.dart';
 import 'create_grocery_product_screen.dart';
+import 'customer_review_screen.dart'; // Added import for CustomerReviewScreen
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,7 +18,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   List<dynamic> restaurants = [];
-  bool isLoading = true;
+  List<Map<String, dynamic>> groceries = [];
+  bool isLoadingRestaurants = true;
+  bool isLoadingGroceries = true;
   int _selectedIndex = 0;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -28,6 +31,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(CurvedAnimation(parent: _animationController, curve: Curves.easeInOut));
     _fetchRestaurants();
+    _fetchGroceries();
     _animationController.forward();
   }
 
@@ -38,13 +42,39 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       if (mounted) {
         setState(() {
           restaurants = fetchedRestaurants.take(10).toList();
-          isLoading = false;
+          isLoadingRestaurants = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
-        setState(() => isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error fetching restaurants: $e'), backgroundColor: Colors.red));
+        setState(() => isLoadingRestaurants = false);
+      }
+    }
+  }
+
+  Future<void> _fetchGroceries() async {
+    try {
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      final fetchedGroceries = await auth.fetchGroceryProducts();
+      if (mounted) {
+        setState(() {
+          groceries = fetchedGroceries.expand((grocery) {
+            final items = grocery['items'] as List<dynamic>? ?? [];
+            return items.map((item) => {
+                  'id': grocery['id']?.toString() ?? 'unknown',
+                  'name': item['name']?.toString() ?? 'Unnamed',
+                  'price': (item['price'] as num?)?.toDouble() ?? 0.0,
+                  'image': item['image']?.toString(),
+                });
+          }).take(5).toList(); // Limit to 5 groceries
+          isLoadingGroceries = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error fetching groceries: $e'), backgroundColor: Colors.red));
+        setState(() => isLoadingGroceries = false);
       }
     }
   }
@@ -57,9 +87,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       2: '/orders',
       3: '/profile',
       4: '/restaurant-owner',
-      5: '/dashers', // New Dasher tab
+      5: '/dashers',
     };
-    if (index != 0 && routes.containsKey(index)) { // 0 is Home, stay if tapped
+    if (index != 0 && routes.containsKey(index)) {
       Navigator.pushReplacementNamed(context, routes[index]!);
     }
   }
@@ -238,7 +268,7 @@ Full policy at chiwexpress.com/privacy.
                               const SizedBox(height: 8),
                               Text(
                                 'Role: $userRole',
-                                style: GoogleFonts.poppins(fontSize: 14, color: Colors.white), // Changed to white
+                                style: GoogleFonts.poppins(fontSize: 14, color: Colors.white),
                               ),
                               const SizedBox(height: 30),
                               Text(
@@ -265,7 +295,7 @@ Full policy at chiwexpress.com/privacy.
                               const SizedBox(height: 16),
                               SizedBox(
                                 height: 220,
-                                child: isLoading
+                                child: isLoadingRestaurants
                                     ? const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEF2A39))))
                                     : restaurants.isEmpty
                                         ? Center(
@@ -299,11 +329,49 @@ Full policy at chiwexpress.com/privacy.
                               ),
                               const SizedBox(height: 30),
                               Text(
+                                'Featured Groceries',
+                                style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
+                              ),
+                              const SizedBox(height: 16),
+                              SizedBox(
+                                height: 200,
+                                child: isLoadingGroceries
+                                    ? const Center(child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFEF2A39))))
+                                    : groceries.isEmpty
+                                        ? Center(
+                                            child: Text(
+                                              'No groceries yet',
+                                              style: GoogleFonts.poppins(color: textColor.withOpacity(0.7)),
+                                            ),
+                                          )
+                                        : ListView.builder(
+                                            scrollDirection: Axis.horizontal,
+                                            itemCount: groceries.length,
+                                            itemBuilder: (context, index) => _buildGroceryCard(groceries[index]),
+                                          ),
+                              ),
+                              const SizedBox(height: 30),
+                              Text(
                                 'What Our Users Say',
                                 style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
                               ),
                               const SizedBox(height: 16),
                               _buildTestimonialCarousel(),
+                              const SizedBox(height: 16),
+                              Center(
+                                child: ElevatedButton(
+                                  onPressed: () => Navigator.pushNamed(context, '/reviews'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFFEF2A39),
+                                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  child: Text(
+                                    'See All Reviews',
+                                    style: GoogleFonts.poppins(fontSize: 16, color: Colors.white),
+                                  ),
+                                ),
+                              ),
                               const SizedBox(height: 30),
                               Text(
                                 'Quick Actions',
@@ -407,7 +475,7 @@ Full policy at chiwexpress.com/privacy.
           BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Orders'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
           BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Owner'),
-          BottomNavigationBarItem(icon: Icon(Icons.directions_bike), label: 'Dasher'), // New Dasher tab
+          BottomNavigationBarItem(icon: Icon(Icons.directions_bike), label: 'Dasher'),
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: const Color(0xFFEF2A39),
@@ -519,6 +587,56 @@ Full policy at chiwexpress.com/privacy.
                   Text(
                     description,
                     style: GoogleFonts.poppins(fontSize: 10, color: textColor.withOpacity(0.7)),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGroceryCard(Map<String, dynamic> grocery) {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, '/groceries'),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        margin: const EdgeInsets.only(right: 16),
+        width: 160,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4))],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+              child: Image.network(
+                grocery['image'] ?? 'https://via.placeholder.com/160x120', // Fallback image
+                height: 120,
+                width: 160,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const Icon(Icons.error, size: 120, color: Colors.red),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    grocery['name'] ?? 'Unnamed',
+                    style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    '₦${grocery['price']?.toStringAsFixed(2) ?? 'N/A'}',
+                    style: GoogleFonts.poppins(fontSize: 12, color: textColor.withOpacity(0.6)),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),

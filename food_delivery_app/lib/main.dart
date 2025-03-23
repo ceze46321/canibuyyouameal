@@ -20,7 +20,8 @@ import 'screens/dashboard_screen.dart';
 import 'screens/logistics_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/grocery_screen.dart';
-import 'screens/dasher_screen.dart'; // Added DasherScreen import
+import 'screens/dasher_screen.dart';
+import 'screens/customer_review_screen.dart'; // New import
 
 const primaryColor = Color(0xFFFF7043); // Warm Coral
 const textColor = Color(0xFF3E2723); // Deep Brown
@@ -95,7 +96,7 @@ class _MyAppState extends State<MyApp> {
     final uri = Uri.parse(link);
     debugPrint('Handling deep link: $link');
 
-    if (uri.scheme == 'canibuyyouamealexpress') { // Updated scheme to match your app name
+    if (uri.scheme == 'canibuyyouamealexpress') {
       if (uri.host == 'groceries') {
         final groceryId = uri.queryParameters['grocery_id'];
         final status = uri.queryParameters['status'];
@@ -184,7 +185,7 @@ class _MyAppState extends State<MyApp> {
           return const LoginScreen();
         },
         '/signup': (context) => const SignUpScreen(),
-        '/home': (context) => const home.HomeScreen(), // Use alias
+        '/home': (context) => const home.HomeScreen(),
         '/add-restaurant': (context) => const AddRestaurantScreen(),
         '/dashboard': (context) => const DashboardScreen(),
         '/profile': (context) => const ProfileScreen(),
@@ -202,7 +203,7 @@ class _MyAppState extends State<MyApp> {
           debugPrint('Navigating to MyGroceriesScreen with groceryId: $groceryId, status: $status');
           return const MyGroceriesScreen();
         },
-        '/dashers': (context) => const DasherScreen(), // Updated to use DasherScreen
+        '/dashers': (context) => const DasherScreen(),
         '/logistics': (context) => const LogisticsScreen(),
         '/groceries': (context) {
           final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
@@ -223,6 +224,10 @@ class _MyAppState extends State<MyApp> {
         '/restaurant-owner': (context) => const RestaurantOwnerScreen(),
         '/cart': (context) => const CartScreen(),
         '/checkout': (context) => const CheckoutScreen(),
+        '/reviews': (context) { // New route for CustomerReviewScreen
+          debugPrint('Navigating to CustomerReviewScreen');
+          return const CustomerReviewScreen();
+        },
       },
       onUnknownRoute: (settings) {
         debugPrint('Unknown route: ${settings.name}');

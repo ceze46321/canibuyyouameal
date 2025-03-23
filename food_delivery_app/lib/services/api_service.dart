@@ -297,15 +297,19 @@ class ApiService {
     return data is List ? data : data['groceries'] ?? data['data'] ?? [];
   }
 
-  // New API Endpoints (Add here)
-  // Example: Get Dasher-specific orders
+  // Dasher Methods
   Future<List<dynamic>> getDasherOrders() async {
     final data = await get('/dasher/orders');
     return data is List ? data : data['orders'] ?? [];
   }
 
-  // Example: Accept an order as a Dasher
   Future<Map<String, dynamic>> acceptOrder(String orderId) async {
     return await post('/dasher/orders/$orderId/accept', {});
+  }
+
+  // New Method: Fetch Customer Reviews
+  Future<List<dynamic>> fetchCustomerReviews() async {
+    final data = await get('/customer-reviews');
+    return data is List ? data : data['reviews'] ?? data['data'] ?? [];
   }
 }

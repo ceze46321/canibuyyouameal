@@ -1,20 +1,25 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' as material; // Alias for Material
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import '../auth_provider.dart';
-import 'checkout_screen.dart'; // Adjusted import assuming lib/screens/
+import 'checkout_screen.dart';
 import '../main.dart' show primaryColor, textColor, accentColor;
 
-class CartScreen extends StatefulWidget {
+class CartScreen extends material.StatefulWidget {
   const CartScreen({super.key});
 
   @override
-  State<CartScreen> createState() => _CartScreenState();
+  material.State<CartScreen> createState() => _CartScreenState();
 }
 
-class _CartScreenState extends State<CartScreen> {
-  int _selectedIndex = 2;
+class _CartScreenState extends material.State<CartScreen> {
+  static const material.Color doorDashRed = material.Color(0xFFEF2A39);
+  static const material.Color doorDashGrey = material.Color(0xFF757575);
+  static const material.Color doorDashLightGrey = material.Color(0xFFF5F5F5);
+  static const material.Color doorDashWhite = material.Color(0xFFFFFFFF);
+
+  int _selectedIndex = 3; // Set to Orders tab (index 3 in new navigation)
   bool _isProcessing = false;
 
   @override
@@ -25,22 +30,16 @@ class _CartScreenState extends State<CartScreen> {
 
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
-    switch (index) {
-      case 0:
-        Navigator.pushReplacementNamed(context, '/home');
-        break;
-      case 1:
-        Navigator.pushReplacementNamed(context, '/restaurants');
-        break;
-      case 2:
-        Navigator.pushReplacementNamed(context, '/orders');
-        break;
-      case 3:
-        Navigator.pushReplacementNamed(context, '/profile');
-        break;
-      case 4:
-        Navigator.pushReplacementNamed(context, '/restaurant-owner');
-        break;
+    final routes = {
+      0: '/home',
+      1: '/restaurants',
+      2: '/groceries',
+      3: '/orders', // Current screen
+      4: '/profile',
+      5: '/restaurant-owner',
+    };
+    if (index != 3 && routes.containsKey(index)) {
+      material.Navigator.pushReplacementNamed(context, routes[index]!); // Fixed
     }
   }
 
@@ -62,15 +61,27 @@ class _CartScreenState extends State<CartScreen> {
 
       await auth.confirmOrderPayment(order['id'].toString(), 'completed');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Order placed! Tracking: ${order['tracking_number']}'), backgroundColor: accentColor),
+        material.ScaffoldMessenger.of(context).showSnackBar(
+          material.SnackBar(
+            content: material.Text('Order placed! Tracking: ${order['tracking_number']}', style: GoogleFonts.poppins(color: doorDashWhite)),
+            backgroundColor: doorDashRed,
+            behavior: material.SnackBarBehavior.floating,
+            shape: material.RoundedRectangleBorder(borderRadius: material.BorderRadius.circular(8)),
+          ),
         );
         auth.clearCart();
-        Navigator.pushReplacementNamed(context, '/orders');
+        material.Navigator.pushReplacementNamed(context, '/orders'); // Fixed
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red));
+        material.ScaffoldMessenger.of(context).showSnackBar(
+          material.SnackBar(
+            content: material.Text('Error: $e', style: GoogleFonts.poppins(color: doorDashWhite)),
+            backgroundColor: material.Colors.redAccent,
+            behavior: material.SnackBarBehavior.floating,
+            shape: material.RoundedRectangleBorder(borderRadius: material.BorderRadius.circular(8)),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isProcessing = false);
@@ -78,85 +89,170 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> _checkoutWithFlutterwave() async {
-    Navigator.push(
+    material.Navigator.push( // Fixed
       context,
-      MaterialPageRoute(builder: (context) => const CheckoutScreen()),
+      material.MaterialPageRoute(builder: (context) => const CheckoutScreen()),
     );
   }
 
   @override
-  Widget build(BuildContext context) {
+  material.Widget build(material.BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Your Cart', style: GoogleFonts.poppins(color: Colors.white)),
-        backgroundColor: primaryColor,
+    return material.Scaffold(
+      backgroundColor: doorDashLightGrey,
+      appBar: material.AppBar(
+        backgroundColor: doorDashRed,
+        elevation: 0,
+        leading: material.IconButton(
+          icon: const material.Icon(material.Icons.arrow_back_ios, color: doorDashWhite, size: 20),
+          onPressed: () => material.Navigator.pop(context), // Fixed
+        ),
+        title: material.Text(
+          'Your Cart',
+          style: GoogleFonts.poppins(
+            fontSize: 22,
+            fontWeight: material.FontWeight.w600,
+            color: doorDashWhite,
+          ),
+        ),
+        centerTitle: true,
+        flexibleSpace: material.Container(
+          decoration: material.BoxDecoration(
+            gradient: material.LinearGradient(
+              colors: [doorDashRed, doorDashRed.withOpacity(0.9)],
+              begin: material.Alignment.topCenter,
+              end: material.Alignment.bottomCenter,
+            ),
+          ),
+        ),
       ),
       body: auth.cartItems.isEmpty
-          ? Center(child: Text('Cart is empty', style: GoogleFonts.poppins(fontSize: 18, color: textColor)))
-          : Column(
+          ? material.Center(
+              child: material.Text(
+                'Your cart is empty',
+                style: GoogleFonts.poppins(fontSize: 18, color: doorDashGrey),
+              ),
+            )
+          : material.Column(
               children: [
-                Expanded(
-                  child: ListView.builder(
+                material.Expanded(
+                  child: material.ListView.builder(
+                    padding: const material.EdgeInsets.all(16.0),
                     itemCount: auth.cartItems.length,
                     itemBuilder: (context, index) {
                       final item = auth.cartItems[index];
-                      return ListTile(
-                        title: Text(item.name, style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(item.restaurantName ?? 'Unknown Restaurant',
-                                style: GoogleFonts.poppins(color: textColor.withOpacity(0.7))),
-                            Text('\$${item.price.toStringAsFixed(2)} x ${item.quantity}',
-                                style: GoogleFonts.poppins()),
-                          ],
-                        ),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => auth.removeFromCart(item.name),
-                            ),
-                          ],
+                      return material.Card(
+                        elevation: 2,
+                        shape: material.RoundedRectangleBorder(borderRadius: material.BorderRadius.circular(12)),
+                        margin: const material.EdgeInsets.only(bottom: 12.0),
+                        child: material.Padding(
+                          padding: const material.EdgeInsets.all(12.0),
+                          child: material.Row(
+                            children: [
+                              material.Expanded(
+                                child: material.Column(
+                                  crossAxisAlignment: material.CrossAxisAlignment.start,
+                                  children: [
+                                    material.Text(
+                                      item.name,
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 16,
+                                        fontWeight: material.FontWeight.bold,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                    const material.SizedBox(height: 4),
+                                    material.Text(
+                                      item.restaurantName ?? 'Unknown Restaurant',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14,
+                                        color: doorDashGrey,
+                                      ),
+                                    ),
+                                    const material.SizedBox(height: 4),
+                                    material.Text(
+                                      '\$${item.price.toStringAsFixed(2)} x ${item.quantity}',
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 14,
+                                        color: textColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              material.IconButton(
+                                icon: const material.Icon(material.Icons.delete, color: material.Colors.redAccent),
+                                onPressed: () => auth.removeFromCart(item.name),
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
+                material.Container(
+                  color: doorDashWhite,
+                  padding: const material.EdgeInsets.all(16.0),
+                  child: material.Column(
                     children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      material.Row(
+                        mainAxisAlignment: material.MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Total:', style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold)),
-                          Text('\$${auth.cartTotal.toStringAsFixed(2)}',
-                              style: GoogleFonts.poppins(fontSize: 20)),
+                          material.Text(
+                            'Total:',
+                            style: GoogleFonts.poppins(
+                              fontSize: 20,
+                              fontWeight: material.FontWeight.bold,
+                              color: textColor,
+                            ),
+                          ),
+                          material.Text(
+                            '\$${auth.cartTotal.toStringAsFixed(2)}',
+                            style: GoogleFonts.poppins(
+                              fontSize: 20,
+                              fontWeight: material.FontWeight.bold,
+                              color: doorDashRed,
+                            ),
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      const material.SizedBox(height: 16),
                       _isProcessing
-                          ? const CircularProgressIndicator()
-                          : Column(
+                          ? const material.Center(child: material.CircularProgressIndicator(color: doorDashRed))
+                          : material.Column(
                               children: [
-                                ElevatedButton(
+                                material.ElevatedButton(
                                   onPressed: () => _checkoutWithStripe(auth),
-                                  style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
-                                  child: Text('Checkout with Stripe', style: GoogleFonts.poppins(fontSize: 16)),
-                                ),
-                                const SizedBox(height: 8),
-                                ElevatedButton(
-                                  onPressed: _checkoutWithFlutterwave,
-                                  style: ElevatedButton.styleFrom(
-                                    minimumSize: const Size(double.infinity, 50),
-                                    backgroundColor: accentColor,
+                                  style: material.ElevatedButton.styleFrom(
+                                    backgroundColor: doorDashRed,
+                                    minimumSize: const material.Size(double.infinity, 50),
+                                    shape: material.RoundedRectangleBorder(borderRadius: material.BorderRadius.circular(12)),
                                   ),
-                                  child: Text('Checkout with Flutterwave',
-                                      style: GoogleFonts.poppins(fontSize: 16, color: Colors.white)),
+                                  child: material.Text(
+                                    'Checkout with Stripe',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 16,
+                                      color: doorDashWhite,
+                                    ),
+                                  ),
+                                ),
+                                const material.SizedBox(height: 12),
+                                material.ElevatedButton(
+                                  onPressed: _checkoutWithFlutterwave,
+                                  style: material.ElevatedButton.styleFrom(
+                                    backgroundColor: accentColor,
+                                    minimumSize: const material.Size(double.infinity, 50),
+                                    shape: material.RoundedRectangleBorder(borderRadius: material.BorderRadius.circular(12)),
+                                  ),
+                                  child: material.Text(
+                                    'Checkout with Flutterwave',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 16,
+                                      color: doorDashWhite,
+                                    ),
+                                  ),
                                 ),
                               ],
                             ),
@@ -165,19 +261,23 @@ class _CartScreenState extends State<CartScreen> {
                 ),
               ],
             ),
-      bottomNavigationBar: BottomNavigationBar(
+      bottomNavigationBar: material.BottomNavigationBar(
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.restaurant), label: 'Restaurants'),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Orders'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-          BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Owner'),
+          material.BottomNavigationBarItem(icon: material.Icon(material.Icons.home), label: 'Home'),
+          material.BottomNavigationBarItem(icon: material.Icon(material.Icons.restaurant), label: 'Restaurants'),
+          material.BottomNavigationBarItem(icon: material.Icon(material.Icons.local_grocery_store), label: 'Groceries'),
+          material.BottomNavigationBarItem(icon: material.Icon(material.Icons.shopping_cart), label: 'Orders'),
+          material.BottomNavigationBarItem(icon: material.Icon(material.Icons.person), label: 'Profile'),
+          material.BottomNavigationBarItem(icon: material.Icon(material.Icons.store), label: 'Owner'),
         ],
         currentIndex: _selectedIndex,
-        selectedItemColor: primaryColor,
-        unselectedItemColor: textColor.withOpacity(0.6),
+        selectedItemColor: doorDashRed,
+        unselectedItemColor: doorDashGrey,
+        backgroundColor: doorDashWhite,
+        type: material.BottomNavigationBarType.fixed,
+        selectedLabelStyle: GoogleFonts.poppins(fontWeight: material.FontWeight.w600),
+        unselectedLabelStyle: GoogleFonts.poppins(),
         onTap: _onItemTapped,
-        type: BottomNavigationBarType.fixed,
       ),
     );
   }
