@@ -263,7 +263,7 @@ Full policy at chiwexpress.com/privacy.
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Join Chiw Express today!',
+                                    'Join CanIbuyYouAmeal Express today!',
                                     style: GoogleFonts.poppins(
                                       fontSize: 14,
                                       color: textColor.withOpacity(0.7),
@@ -341,7 +341,7 @@ Full policy at chiwexpress.com/privacy.
                                     ),
                                     items: const [
                                       DropdownMenuItem(value: 'customer', child: Text('Customer')),
-                                      DropdownMenuItem(value: 'merchant', child: Text('Merchant')),
+                                      DropdownMenuItem(value: 'Restaurant Owners', child: Text('Restaurant Owners')),
                                       DropdownMenuItem(value: 'dasher', child: Text('Dasher')),
                                     ],
                                     onChanged: (value) => setState(() => _role = value!),

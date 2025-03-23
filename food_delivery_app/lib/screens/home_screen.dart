@@ -5,6 +5,8 @@ import '../auth_provider.dart';
 import '../main.dart' show textColor, accentColor;
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'add_grocery_screen.dart'; // Import for AddGroceryScreen
+import 'create_grocery_product_screen.dart'; // Import for CreateGroceryProductScreen
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -76,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         content: SingleChildScrollView(
           child: Text(
             '''
-Welcome to Chiw Express! By using this app, you agree to:
+Welcome to CanIbuyYouAmeal Express! By using this app, you agree to:
 
 1. **Usage**: Use the app for lawful purposes only.
 2. **Account**: Keep your credentials secure; you’re responsible for all activity.
@@ -108,7 +110,7 @@ Full terms at chiwexpress.com/terms.
         content: SingleChildScrollView(
           child: Text(
             '''
-At Chiw Express, your privacy matters:
+At CanIbuyYouAmeal Express, your privacy matters:
 
 1. **Data Collection**: We collect name, email, and role for account creation.
 2. **Usage**: Data is used to provide and improve services.
@@ -142,6 +144,7 @@ Full policy at chiwexpress.com/privacy.
     final auth = Provider.of<AuthProvider>(context);
     final userName = auth.name ?? 'Foodie';
     final userRole = auth.role ?? 'Visitor';
+    print('HomeScreen - Role: ${auth.role}, IsRestaurantOwner: ${auth.isRestaurantOwner}'); // Debug role
 
     return Scaffold(
       body: Stack(
@@ -300,9 +303,9 @@ Full policy at chiwexpress.com/privacy.
                                 child: ListView(
                                   scrollDirection: Axis.horizontal,
                                   children: [
-                                    _buildDishCard('Jollof Rice', 'https://i.imgur.com/8xN5K9P.jpg', 'Spicy & Savory'),
-                                    _buildDishCard('Pounded Yam', 'https://i.imgur.com/5zX7vQw.jpg', 'With Egusi Soup'),
-                                    _buildDishCard('Suya', 'https://i.imgur.com/Q3mK9tL.jpg', 'Grilled Perfection'),
+                                    _buildDishCard('Jollof Rice', 'https://images.ctfassets.net/trvmqu12jq2l/6FV4Opt7wUyR91t2FXyOIr/f32972fce10fc87585e831b334ea17ef/header.jpg?q=70&w=1208&h=1080&f=faces&fit=fill', 'Spicy & Savory'),
+                                    _buildDishCard('Pounded Yam', 'https://s3-media0.fl.yelpcdn.com/bphoto/4x8-Rjfell2DBqbrHSbCsg/348s.jpg', 'With Egusi Soup'),
+                                    _buildDishCard('Suya', 'https://assets.simpleviewinc.com/grandrapidsdamsub/image/upload/c_fill,f_jpg,g_xy_center,h_1200,q_95,w_900,x_4752,y_3168/v1/cms_resources/clients/grandrapids/042_3_16212_jpeg_af93ea51-3de2-404e-b5c4-21aa68737022.jpg', 'Grilled Perfection'),
                                   ],
                                 ),
                               ),
@@ -331,7 +334,16 @@ Full policy at chiwexpress.com/privacy.
                                   _buildActionButton(context, 'Order Now', Icons.fastfood, () => Navigator.pushNamed(context, '/restaurants')),
                                   _buildActionButton(context, 'Track Order', Icons.local_shipping, () => Navigator.pushNamed(context, '/orders')),
                                   _buildActionButton(context, 'Groceries', Icons.local_grocery_store, () => Navigator.pushNamed(context, '/groceries')),
-                                  if (userRole == 'owner' || userRole == 'merchant')
+                                  _buildActionButton(context, 'Add Grocery Order', Icons.add_shopping_cart, () {
+                                    print('Navigating to AddGroceryScreen from Home');
+                                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AddGroceryScreen()));
+                                  }),
+                                  if (auth.isRestaurantOwner)
+                                    _buildActionButton(context, 'Create Grocery Product', Icons.add_circle, () {
+                                      print('Navigating to CreateGroceryProductScreen from Home');
+                                      Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateGroceryProductScreen()));
+                                    }),
+                                  if (userRole == 'owner' || userRole == 'restaurant_owner')
                                     _buildActionButton(context, 'Add Restaurant', Icons.store, () => Navigator.pushNamed(context, '/add-restaurant').then((_) => _fetchRestaurants())),
                                   if (userRole == 'dasher')
                                     _buildActionButton(context, 'Deliver', Icons.directions_bike, () => Navigator.pushNamed(context, '/dashers')),
@@ -469,7 +481,7 @@ Full policy at chiwexpress.com/privacy.
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               child: Image.network(
-                restaurant['image'] ?? 'https://via.placeholder.com/150',
+                restaurant['image'] ?? 'https://images.ctfassets.net/trvmqu12jq2l/6FV4Opt7wUyR91t2FXyOIr/f32972fce10fc87585e831b334ea17ef/header.jpg?q=70&w=1208&h=1080&f=faces&fit=fill',
                 height: 120,
                 width: 160,
                 fit: BoxFit.cover,
@@ -611,7 +623,7 @@ Full policy at chiwexpress.com/privacy.
   }
 }
 
-// Subtle texture painter (reused from previous screens)
+// Subtle texture painter
 class SubtleTexturePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {

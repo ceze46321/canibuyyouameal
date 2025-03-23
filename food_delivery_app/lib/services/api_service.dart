@@ -5,7 +5,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  static const String baseUrl = 'https://plus.apexjets.org/api'; // Your Laravel API URL
+  static const String baseUrl = 'https://plus.apexjets.org/api';
   static const String overpassUrl = 'https://overpass-api.de/api/interpreter';
   static const String googlePlacesUrl = 'https://maps.googleapis.com/maps/api/place';
   static String get googleApiKey => dotenv.env['GOOGLE_API_KEY'] ?? 'YOUR_GOOGLE_API_KEY';
@@ -30,7 +30,6 @@ class ApiService {
   Future<void> loadToken() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('auth_token');
-    print('ApiService: Loaded token from storage: $_token');
   }
 
   // Set token and persist it
@@ -38,7 +37,6 @@ class ApiService {
     _token = token;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('auth_token', token);
-    print('ApiService: Token set to $token and persisted');
   }
 
   // Clear token
@@ -46,81 +44,94 @@ class ApiService {
     _token = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('auth_token');
-    print('ApiService: Token cleared');
   }
 
-  // Handle HTTP response with consistent error handling
+  // Generic HTTP Methods
+  Future<dynamic> get(String path) async {
+    if (_token == null && !path.startsWith('/login') && !path.startsWith('/register')) {
+      throw Exception('No token set. Please log in.');
+    }
+    final url = '$baseUrl$path';
+    final response = await http.get(Uri.parse(url), headers: headers);
+    return _handleResponse(response, action: 'GET $path');
+  }
+
+  Future<dynamic> post(String path, dynamic data) async {
+    if (_token == null && !path.startsWith('/login') && !path.startsWith('/register')) {
+      throw Exception('No token set. Please log in.');
+    }
+    final url = '$baseUrl$path';
+    final body = json.encode(data);
+    final response = await http.post(Uri.parse(url), headers: headers, body: body);
+    return _handleResponse(response, action: 'POST $path');
+  }
+
+  Future<dynamic> put(String path, dynamic data) async {
+    if (_token == null) throw Exception('No token set. Please log in.');
+    final url = '$baseUrl$path';
+    final body = json.encode(data);
+    final response = await http.put(Uri.parse(url), headers: headers, body: body);
+    return _handleResponse(response, action: 'PUT $path');
+  }
+
+  Future<dynamic> delete(String path) async {
+    if (_token == null) throw Exception('No token set. Please log in.');
+    final url = '$baseUrl$path';
+    final response = await http.delete(Uri.parse(url), headers: headers);
+    return _handleResponse(response, action: 'DELETE $path');
+  }
+
+  // Handle HTTP response
   Future<dynamic> _handleResponse(http.Response response, {String action = 'API request'}) async {
-    print('$action Response: ${response.statusCode} - ${response.body}');
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      return json.decode(response.body);
+      return response.body.isNotEmpty ? json.decode(response.body) : null;
     }
     throw Exception('$action failed: ${response.statusCode} - ${response.body}');
   }
 
   // Authentication Methods
   Future<Map<String, dynamic>> register(String name, String email, String password, String role) async {
-    final body = json.encode({'name': name, 'email': email, 'password': password, 'role': role});
-    print('ApiService: Register Request - URL: $baseUrl/register, Headers: $headers, Body: $body');
-    final response = await http.post(Uri.parse('$baseUrl/register'), headers: headers, body: body);
-    return await _handleResponse(response, action: 'Register');
+    return await post('/register', {'name': name, 'email': email, 'password': password, 'role': role});
   }
 
   Future<Map<String, dynamic>> login(String email, String password) async {
-    final body = json.encode({'email': email, 'password': password});
-    print('ApiService: Login Request - URL: $baseUrl/login, Headers: $headers, Body: $body');
-    final response = await http.post(Uri.parse('$baseUrl/login'), headers: headers, body: body);
-    return await _handleResponse(response, action: 'Login');
+    return await post('/login', {'email': email, 'password': password});
   }
 
   Future<Map<String, dynamic>> loginWithGoogle(String email, String accessToken) async {
-    final body = json.encode({'email': email, 'google_token': accessToken});
-    print('ApiService: Google Login Request - URL: $baseUrl/google-login, Headers: $headers, Body: $body');
-    final response = await http.post(Uri.parse('$baseUrl/google-login'), headers: headers, body: body);
-    return await _handleResponse(response, action: 'Google Login');
+    return await post('/google-login', {'email': email, 'google_token': accessToken});
   }
 
   Future<void> logout() async {
     if (_token == null) {
-      print('ApiService: No token to logout');
       await clearToken();
       return;
     }
-    print('ApiService: Logout Request - URL: $baseUrl/logout, Headers: $headers');
-    final response = await http.post(Uri.parse('$baseUrl/logout'), headers: headers);
-    await _handleResponse(response, action: 'Logout');
+    await post('/logout', {});
     await clearToken();
   }
 
   Future<Map<String, dynamic>> getProfile() async {
-    if (_token == null) throw Exception('No token set. Please log in.');
-    print('ApiService: Fetching profile - URL: $baseUrl/profile, Headers: $headers');
-    final response = await http.get(Uri.parse('$baseUrl/profile'), headers: headers);
-    final data = await _handleResponse(response, action: 'Get Profile');
-    print('ApiService: Profile Data - $data');
-    return data;
+    return await get('/profile');
   }
 
-  Future<Map<String, dynamic>> updateProfile(String name, String email, {String? deliveryLocation}) async {
-    if (_token == null) throw Exception('No token set. Please log in.');
-    final body = json.encode({
+  Future<Map<String, dynamic>> updateProfile(
+    String name,
+    String email, {
+    String? deliveryLocation,
+    String? role,
+  }) async {
+    final body = {
       'name': name,
       'email': email,
       if (deliveryLocation != null) 'delivery_location': deliveryLocation,
-    });
-    print('ApiService: Update Profile Request - URL: $baseUrl/profile, Headers: $headers, Body: $body');
-    final response = await http.put(Uri.parse('$baseUrl/profile'), headers: headers, body: body);
-    final data = await _handleResponse(response, action: 'Update Profile');
-    print('ApiService: Update Profile Response - $data');
-    return data;
+      if (role != null) 'role': role,
+    };
+    return await put('/profile', body);
   }
 
   Future<Map<String, dynamic>> upgradeRole(String newRole) async {
-    if (_token == null) throw Exception('No token set. Please log in.');
-    final body = json.encode({'role': newRole});
-    print('ApiService: Upgrade Role Request - URL: $baseUrl/upgrade-role, Headers: $headers, Body: $body');
-    final response = await http.post(Uri.parse('$baseUrl/upgrade-role'), headers: headers, body: body);
-    return await _handleResponse(response, action: 'Upgrade Role');
+    return await post('/upgrade-role', {'role': newRole});
   }
 
   // Restaurant Methods
@@ -130,61 +141,48 @@ class ApiService {
     double north = 14.0,
     double east = 15.0,
   }) async {
-    try {
-      final query = '[out:json];node["amenity"="restaurant"]($south,$west,$north,$east);out;';
-      final url = '$overpassUrl?data=${Uri.encodeQueryComponent(query)}';
-      print('ApiService: Overpass Request - URL: $url');
-      final overpassResponse = await http.get(Uri.parse(url));
-      final overpassData = await _handleResponse(overpassResponse, action: 'Overpass Fetch');
-      final elements = overpassData['elements'] as List<dynamic>;
-      List<Map<String, dynamic>> restaurants = [];
+    final query = '[out:json];node["amenity"="restaurant"]($south,$west,$north,$east);out;';
+    final url = '$overpassUrl?data=${Uri.encodeQueryComponent(query)}';
+    final response = await http.get(Uri.parse(url));
+    final overpassData = await _handleResponse(response, action: 'Overpass Fetch');
+    final elements = overpassData['elements'] as List<dynamic>;
+    List<Map<String, dynamic>> restaurants = [];
 
-      for (var restaurant in elements) {
-        final name = restaurant['tags']['name'] ?? 'Unnamed Restaurant';
-        final lat = restaurant['lat'].toString();
-        final lon = restaurant['lon'].toString();
+    for (var restaurant in elements) {
+      final name = restaurant['tags']['name'] ?? 'Unnamed Restaurant';
+      final lat = restaurant['lat'].toString();
+      final lon = restaurant['lon'].toString();
 
-        String? imageUrl;
-        final googleUrl = '$googlePlacesUrl/nearbysearch/json?location=$lat,$lon&radius=500&type=restaurant&keyword=$name&key=$googleApiKey';
-        print('ApiService: Google Places Request - URL: $googleUrl');
-        final googleResponse = await http.get(Uri.parse(googleUrl));
-        if (googleResponse.statusCode == 200) {
-          final googleData = json.decode(googleResponse.body);
-          if (googleData['results'].isNotEmpty && googleData['results'][0]['photos'] != null) {
-            final photoReference = googleData['results'][0]['photos'][0]['photo_reference'];
-            imageUrl = '$googlePlacesUrl/photo?maxwidth=400&photoreference=$photoReference&key=$googleApiKey';
-          }
-        } else {
-          print('ApiService: Google Places Error - Status: ${googleResponse.statusCode}');
+      String? imageUrl;
+      final googleUrl = '$googlePlacesUrl/nearbysearch/json?location=$lat,$lon&radius=500&type=restaurant&keyword=$name&key=$googleApiKey';
+      final googleResponse = await http.get(Uri.parse(googleUrl));
+      if (googleResponse.statusCode == 200) {
+        final googleData = json.decode(googleResponse.body);
+        if (googleData['results'].isNotEmpty && googleData['results'][0]['photos'] != null) {
+          final photoReference = googleData['results'][0]['photos'][0]['photo_reference'];
+          imageUrl = '$googlePlacesUrl/photo?maxwidth=400&photoreference=$photoReference&key=$googleApiKey';
         }
-
-        restaurants.add({
-          'id': restaurant['id'].toString(),
-          'name': name,
-          'lat': lat,
-          'lon': lon,
-          'image': imageUrl ?? 'https://via.placeholder.com/300',
-          'tags': restaurant['tags'],
-        });
       }
-      print('ApiService: Overpass Restaurants - $restaurants');
-      return restaurants;
-    } catch (e) {
-      print('ApiService: Overpass Fetch Error: $e');
-      rethrow;
+
+      restaurants.add({
+        'id': restaurant['id'].toString(),
+        'name': name,
+        'lat': lat,
+        'lon': lon,
+        'image': imageUrl ?? 'https://via.placeholder.com/300',
+        'tags': restaurant['tags'],
+      });
     }
+    return restaurants;
   }
 
   Future<Map<String, double>> getBoundingBox(String location) async {
-    print('ApiService: Getting bounding box for location: $location');
     final locations = await locationFromAddress(location);
     if (locations.isEmpty) throw Exception('Location not found');
     final lat = locations.first.latitude;
     final lon = locations.first.longitude;
     const delta = 0.45; // ~50km
-    final result = {'south': lat - delta, 'west': lon - delta, 'north': lat + delta, 'east': lon + delta};
-    print('ApiService: Bounding Box - $result');
-    return result;
+    return {'south': lat - delta, 'west': lon - delta, 'north': lat + delta, 'east': lon + delta};
   }
 
   Future<Map<String, dynamic>> addRestaurant(
@@ -198,8 +196,7 @@ class ApiService {
     String? image,
     required List<Map<String, dynamic>> menuItems,
   }) async {
-    if (_token == null) throw Exception('No token set. Please log in.');
-    final body = json.encode({
+    final body = {
       'name': name,
       'address': address,
       'state': state,
@@ -209,90 +206,49 @@ class ApiService {
       'longitude': longitude,
       'image': image,
       'menu_items': menuItems,
-    });
-    print('ApiService: Add Restaurant Request - URL: $baseUrl/restaurants, Headers: $headers, Body: $body');
-    final response = await http.post(Uri.parse('$baseUrl/restaurants'), headers: headers, body: body);
-    return await _handleResponse(response, action: 'Add Restaurant');
+    };
+    return await post('/restaurants', body);
   }
 
   Future<List<dynamic>> getRestaurantsFromApi() async {
-    if (_token == null) throw Exception('No token set. Please log in.');
-    print('ApiService: Fetching restaurants - URL: $baseUrl/restaurants, Headers: $headers');
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/restaurants'), headers: headers);
-      final decoded = await _handleResponse(response, action: 'Get Restaurants from API');
-      if (decoded is List) return decoded;
-      if (decoded is Map<String, dynamic>) {
-        return decoded['restaurants'] ?? decoded['data'] ?? [];
-      }
-      throw Exception('Unexpected response format: ${decoded.runtimeType}');
-    } catch (e, stackTrace) {
-      print('ApiService: GetRestaurantsFromApi Error: $e\nStackTrace: $stackTrace');
-      rethrow;
-    }
+    final data = await get('/restaurants');
+    return data is List ? data : data['restaurants'] ?? data['data'] ?? [];
   }
 
   // Order Management
   Future<List<dynamic>> getOrders() async {
-    if (_token == null) throw Exception('No token set. Please log in.');
-    print('ApiService: Fetching orders - URL: $baseUrl/orders, Headers: $headers');
-    final response = await http.get(Uri.parse('$baseUrl/orders'), headers: headers);
-    final data = await _handleResponse(response, action: 'Get Orders');
+    final data = await get('/orders');
     return data is List ? data : data['orders'] ?? [];
   }
 
   Future<Map<String, dynamic>> placeOrder(Map<String, dynamic> orderData) async {
-    if (_token == null) throw Exception('No token set. Please log in.');
-    final body = json.encode(orderData);
-    print('ApiService: Place Order Request - URL: $baseUrl/orders, Headers: $headers, Body: $body');
-    final response = await http.post(Uri.parse('$baseUrl/orders'), headers: headers, body: body);
-    return await _handleResponse(response, action: 'Place Order');
+    return await post('/orders', orderData);
   }
 
   Future<void> updateOrderPaymentStatus(String orderId, String status) async {
-    if (_token == null) throw Exception('No token set. Please log in.');
-    final body = json.encode({'status': status});
-    print('ApiService: Update Order Payment Status - URL: $baseUrl/orders/$orderId/payment-status, Headers: $headers, Body: $body');
-    final response = await http.put(Uri.parse('$baseUrl/orders/$orderId/payment-status'), headers: headers, body: body);
-    await _handleResponse(response, action: 'Update Order Payment Status');
+    await put('/orders/$orderId/payment-status', {'status': status});
   }
 
   Future<void> cancelOrder(String orderId) async {
-    if (_token == null) throw Exception('No token set. Please log in.');
-    print('ApiService: Cancel Order Request - URL: $baseUrl/orders/$orderId/cancel, Headers: $headers');
-    final response = await http.post(Uri.parse('$baseUrl/orders/$orderId/cancel'), headers: headers);
-    await _handleResponse(response, action: 'Cancel Order');
+    await post('/orders/$orderId/cancel', {});
   }
 
   Future<Map<String, dynamic>> getOrderTracking(String trackingNumber) async {
-    if (_token == null) throw Exception('No token set. Please log in.');
-    print('ApiService: Get Order Tracking - URL: $baseUrl/orders/track/$trackingNumber, Headers: $headers');
-    final response = await http.get(Uri.parse('$baseUrl/orders/track/$trackingNumber'), headers: headers);
-    return await _handleResponse(response, action: 'Get Order Tracking');
+    return await get('/orders/track/$trackingNumber');
   }
 
   Future<List<dynamic>> getRestaurantOrders() async {
-    if (_token == null) throw Exception('No token set. Please log in.');
-    print('ApiService: Fetching restaurant orders - URL: $baseUrl/restaurant-orders, Headers: $headers');
-    final response = await http.get(Uri.parse('$baseUrl/restaurant-orders'), headers: headers);
-    final data = await _handleResponse(response, action: 'Get Restaurant Orders');
+    final data = await get('/restaurant-orders');
     return data is List ? data : data['orders'] ?? [];
   }
 
   Future<void> updateOrderStatus(String orderId, String status) async {
-    if (_token == null) throw Exception('No token set. Please log in.');
-    final body = json.encode({'status': status});
-    print('ApiService: Update Order Status - URL: $baseUrl/orders/$orderId/status, Headers: $headers, Body: $body');
-    final response = await http.put(Uri.parse('$baseUrl/orders/$orderId/status'), headers: headers, body: body);
-    await _handleResponse(response, action: 'Update Order Status');
+    await put('/orders/$orderId/status', {'status': status});
   }
 
   // Grocery Methods
   Future<List<dynamic>> getGroceries() async {
-    if (_token == null) throw Exception('No token set. Please log in.');
-    print('ApiService: Fetching groceries - URL: $baseUrl/grocery, Headers: $headers');
-    final response = await http.get(Uri.parse('$baseUrl/grocery'), headers: headers);
-    final data = await _handleResponse(response, action: 'Get Groceries');
+    final data = await get('/grocery');
     return data is List ? data : data['data'] ?? [];
   }
 
@@ -301,22 +257,25 @@ class ApiService {
   }
 
   Future<Map<String, dynamic>> createGrocery(List<Map<String, dynamic>> items) async {
-    if (_token == null) throw Exception('No token set. Please log in.');
-    final body = json.encode({'items': items});
-    print('ApiService: Create Grocery Request - URL: $baseUrl/grocery, Headers: $headers, Body: $body');
-    final response = await http.post(Uri.parse('$baseUrl/grocery'), headers: headers, body: body);
-    return await _handleResponse(response, action: 'Create Grocery');
+    final totalAmount = items.fold(0.0, (sum, item) => sum + (item['quantity'] * item['price']));
+    final body = {
+      'items': items,
+      'total_amount': totalAmount,
+      'status': 'pending',
+    };
+    return await post('/grocery', body);
+  }
+
+  Future<void> deleteGrocery(String groceryId) async {
+    await delete('/grocery/$groceryId');
   }
 
   Future<Map<String, dynamic>> initiateCheckout(String groceryId, {String paymentMethod = 'stripe'}) async {
-    if (_token == null) throw Exception('No token set. Please log in.');
-    final body = json.encode({'payment_method': paymentMethod});
-    print('ApiService: Initiate Checkout Request - URL: $baseUrl/grocery/$groceryId/checkout, Headers: $headers, Body: $body');
-    final response = await http.post(
-      Uri.parse('$baseUrl/grocery/$groceryId/checkout'),
-      headers: headers,
-      body: body,
-    );
-    return await _handleResponse(response, action: 'Initiate Checkout');
+    return await post('/grocery/$groceryId/checkout', {'payment_method': paymentMethod});
+  }
+
+  Future<List<dynamic>> fetchUserGroceries() async {
+    final data = await get('/user/groceries');
+    return data is List ? data : data['groceries'] ?? data['data'] ?? [];
   }
 }

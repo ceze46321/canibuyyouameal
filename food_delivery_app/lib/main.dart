@@ -14,6 +14,7 @@ import 'screens/restaurant_screen.dart';
 import 'screens/restaurant_profile_screen.dart';
 import 'screens/restaurant_owner_screen.dart';
 import 'screens/order_screen.dart';
+import 'screens/my_groceries_screen.dart'; // Import for grocery orders
 import 'screens/profile_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/logistics_screen.dart';
@@ -22,13 +23,13 @@ import 'screens/grocery_screen.dart';
 
 const primaryColor = Color(0xFFFF7043); // Warm Coral
 const textColor = Color(0xFF3E2723); // Deep Brown
-const accentColor = Color(0xFF66BB6A); // Fresh Green
+const accentColor = Color(0xFFEF2A39); // Updated to match DoorDash red
 const secondaryColor = Color(0xFFFFCA28); // Soft Gold
 
 Future<void> main() async {
   try {
     await dotenv.load(fileName: ".env");
-    debugPrint('Dotenv loaded successfully'); // Use debugPrint for better logging
+    debugPrint('Dotenv loaded successfully');
   } catch (e) {
     debugPrint('Error loading .env: $e');
   }
@@ -43,7 +44,6 @@ Future<void> main() async {
             return authProvider;
           },
         ),
-        // Add more providers here if needed (e.g., for cart)
       ],
       child: const MyApp(),
     ),
@@ -92,16 +92,42 @@ class _MyAppState extends State<MyApp> {
 
   void _handleDeepLink(String link) {
     final uri = Uri.parse(link);
-    if (uri.scheme == 'chiwexpress' && uri.host == 'orders') {
-      final orderId = uri.queryParameters['orderId']; // Match OrderScreen param
-      final status = uri.queryParameters['status'];
-      debugPrint('Handling deep link: $link, orderId: $orderId, status: $status');
-      if (mounted) {
-        Navigator.pushReplacementNamed(
-          context,
-          '/orders',
-          arguments: {'orderId': orderId, 'status': status},
-        );
+    debugPrint('Handling deep link: $link');
+
+    if (uri.scheme == 'chiwexpress') {
+      if (uri.host == 'groceries') {
+        // Handle grocery payment callback (e.g., chiwexpress://groceries?grocery_id=19&status=completed)
+        final groceryId = uri.queryParameters['grocery_id'];
+        final status = uri.queryParameters['status'];
+        if (mounted) {
+          Navigator.pushReplacementNamed(
+            context,
+            '/groceries',
+            arguments: {'groceryId': groceryId, 'status': status},
+          );
+        }
+      } else if (uri.host == 'orders') {
+        // Handle menu order deep links (e.g., chiwexpress://orders?orderId=123&status=completed)
+        final orderId = uri.queryParameters['orderId'];
+        final status = uri.queryParameters['status'];
+        if (mounted) {
+          Navigator.pushReplacementNamed(
+            context,
+            '/orders',
+            arguments: {'orderId': orderId, 'status': status},
+          );
+        }
+      } else if (uri.host == 'my-groceries') {
+        // Handle grocery order deep links (e.g., chiwexpress://my-groceries?groceryId=19&status=completed)
+        final groceryId = uri.queryParameters['groceryId'];
+        final status = uri.queryParameters['status'];
+        if (mounted) {
+          Navigator.pushReplacementNamed(
+            context,
+            '/my-groceries',
+            arguments: {'groceryId': groceryId, 'status': status},
+          );
+        }
       }
     }
   }
@@ -169,12 +195,22 @@ class _MyAppState extends State<MyApp> {
           final orderId = args?['orderId'] as String?;
           final status = args?['status'] as String?;
           debugPrint('Navigating to OrderScreen with orderId: $orderId, status: $status');
-          return OrderScreen(orderId: orderId, initialStatus: status);
+          return OrderScreen(orderId: orderId, initialStatus: status); // Kept for menu orders
+        },
+        '/my-groceries': (context) {
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final groceryId = args?['groceryId'] as String?;
+          final status = args?['status'] as String?;
+          debugPrint('Navigating to MyGroceriesScreen with groceryId: $groceryId, status: $status');
+          return const MyGroceriesScreen(); // New route for grocery orders
         },
         '/dashers': (context) => const Scaffold(body: Center(child: Text('Dashers'))),
         '/logistics': (context) => const LogisticsScreen(),
         '/groceries': (context) {
-          debugPrint('Navigating to GroceryScreen');
+          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final groceryId = args?['groceryId'] as String?;
+          final status = args?['status'] as String?;
+          debugPrint('Navigating to GroceryScreen with groceryId: $groceryId, status: $status');
           return const GroceryScreen();
         },
         '/restaurants': (context) => const RestaurantScreen(),

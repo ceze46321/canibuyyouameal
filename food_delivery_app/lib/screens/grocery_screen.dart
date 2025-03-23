@@ -1,12 +1,15 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_stripe/flutter_stripe.dart' as stripe;
+import 'package:uni_links/uni_links.dart';
 import '../main.dart' show primaryColor, textColor, accentColor;
 import '../auth_provider.dart';
-import '../models/product_model.dart';
 import 'restaurant_screen.dart';
+import 'add_grocery_screen.dart';
+import 'create_grocery_product_screen.dart';
 
 class GroceryScreen extends StatefulWidget {
   const GroceryScreen({super.key});
@@ -21,6 +24,12 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
   List<Map<String, dynamic>> cart = [];
   String searchQuery = '';
   String selectedLocation = 'All';
+  StreamSubscription? _sub;
+  bool _isLoading = true;
+
+  static const Color doorDashRed = Color(0xFFEF2A39);
+  static const Color doorDashGrey = Color(0xFF757575);
+  static const Color doorDashLightGrey = Color(0xFFF5F5F5);
 
   @override
   void initState() {
@@ -28,42 +37,108 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
     stripe.Stripe.publishableKey = 'pk_test_51R3VqwFo5xO98pwdjgCiM3rXeI9My0RcZHHEZPJXipbsjZ80ydOnprPsBQZQ9GEmY6aTARgWb7tWxofFLTGqINfq00seIuXSDB';
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<AuthProvider>(context, listen: false).fetchGroceryProducts();
-    });
+    _fetchGroceries();
+    _initDeepLinkListener();
+  }
+
+  Future<void> _fetchGroceries() async {
+    setState(() => _isLoading = true);
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    try {
+      await authProvider.fetchGroceryProducts();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error fetching groceries: $e'), backgroundColor: Colors.redAccent),
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
   void dispose() {
+    _sub?.cancel();
     _animationController.dispose();
     super.dispose();
   }
 
-  List<Product> _filterGroceries(List<Product> groceries) {
-    return groceries.where((product) {
-      final matchesName = product.name.toLowerCase().contains(searchQuery.toLowerCase());
+  void _initDeepLinkListener() async {
+    final initialLink = await getInitialLink();
+    if (initialLink != null) _handleDeepLink(initialLink);
+
+    _sub = linkStream.listen((String? link) {
+      if (link != null) _handleDeepLink(link);
+    }, onError: (err) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Deep link error: $err'), backgroundColor: Colors.redAccent),
+      );
+    });
+  }
+
+  void _handleDeepLink(String link) {
+    final uri = Uri.parse(link);
+    final status = uri.queryParameters['status'];
+    final message = uri.queryParameters['message'];
+    if (status == 'completed') {
+      setState(() => cart.clear());
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Payment successful!'), backgroundColor: doorDashRed),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Payment $status${message != null ? ': $message' : ''}'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  List<Map<String, dynamic>> _flattenAndFilterGroceries(List<Map<String, dynamic>> groceries) {
+    final allItems = groceries.expand((grocery) {
+      final items = grocery['items'] as List<dynamic>? ?? [];
+      return items.map((item) => {
+            'id': grocery['id']?.toString() ?? 'unknown',
+            'name': item['name']?.toString() ?? 'Unnamed',
+            'quantity': item['quantity'] ?? 1,
+            'price': (item['price'] as num?)?.toDouble() ?? 0.0,
+            'image': item['image']?.toString(),
+          });
+    }).toList();
+
+    return allItems.where((item) {
+      final matchesName = (item['name'] ?? '').toLowerCase().contains(searchQuery.toLowerCase());
       return matchesName;
     }).toList();
   }
 
-  void _addToCart(Product product) {
+  void _addToCart(Map<String, dynamic> item) {
     setState(() {
       cart.add({
-        'id': product.id,
-        'name': product.name,
-        'price': product.price,
-        'quantity': product.quantity,
-        'image': product.imageUrl,
+        'id': item['id'],
+        'name': item['name'],
+        'quantity': item['quantity'],
+        'price': item['price'],
+        'image': item['image'],
       });
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${product.name} added to cart!'), backgroundColor: accentColor),
+      SnackBar(content: Text('${item['name']} added to cart!'), backgroundColor: doorDashRed),
     );
   }
 
   Future<void> _checkout() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (!authProvider.isLoggedIn) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to proceed'), backgroundColor: Colors.redAccent),
+      );
+      Navigator.pushNamed(context, '/login');
+      return;
+    }
+
     if (cart.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cart is empty!'), backgroundColor: Colors.redAccent),
@@ -73,20 +148,44 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
 
     final paymentMethod = await showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Select Payment Method', style: GoogleFonts.poppins()),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              title: Text('Stripe', style: GoogleFonts.poppins()),
-              onTap: () => Navigator.pop(context, 'stripe'),
-            ),
-            ListTile(
-              title: Text('Flutterwave', style: GoogleFonts.poppins()),
-              onTap: () => Navigator.pop(context, 'flutterwave'),
-            ),
-          ],
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4)),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: const BoxDecoration(
+                  color: doorDashRed,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                ),
+                child: Text(
+                  'Choose Payment Method',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ),
+              const SizedBox(height: 16),
+              _buildPaymentOption('Stripe', 'stripe'),
+              const SizedBox(height: 12),
+              _buildPaymentOption('Flutterwave', 'flutterwave'),
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Cancel', style: GoogleFonts.poppins(color: doorDashGrey, fontSize: 16)),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -94,7 +193,6 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
     if (paymentMethod == null) return;
 
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final groceryItems = cart.map((item) => ({
             'name': item['name'],
             'quantity': item['quantity'],
@@ -110,21 +208,20 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
         await stripe.Stripe.instance.initPaymentSheet(
           paymentSheetParameters: stripe.SetupPaymentSheetParameters(
             paymentIntentClientSecret: clientSecret,
-            merchantDisplayName: 'Chiw Express',
+            merchantDisplayName: 'CanIbuyYouAMeal Express',
           ),
         );
         await stripe.Stripe.instance.presentPaymentSheet();
         setState(() => cart.clear());
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Payment successful!'), backgroundColor: accentColor),
+          const SnackBar(content: Text('Payment successful!'), backgroundColor: doorDashRed),
         );
       } else if (paymentMethod == 'flutterwave') {
         final paymentLink = response['payment_link'];
         if (await canLaunchUrl(Uri.parse(paymentLink))) {
           await launchUrl(Uri.parse(paymentLink), mode: LaunchMode.externalApplication);
-          // Note: Cart clearing depends on payment confirmation (e.g., via webhook or manual check)
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Payment initiated! Complete in browser.'), backgroundColor: accentColor),
+            const SnackBar(content: Text('Payment initiated! Complete in browser.'), backgroundColor: doorDashRed),
           );
         } else {
           throw 'Could not launch $paymentLink';
@@ -137,19 +234,41 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
     }
   }
 
+  Widget _buildPaymentOption(String title, String value) {
+    return GestureDetector(
+      onTap: () => Navigator.pop(context, value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: doorDashGrey.withOpacity(0.2)),
+        ),
+        child: Text(
+          title,
+          style: GoogleFonts.poppins(fontSize: 16, color: textColor),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
     final routes = {
       0: '/home',
       1: '/restaurants',
+      2: '/groceries',
       3: '/orders',
       4: '/profile',
       5: '/restaurant-owner',
     };
     if (index != 2 && routes.containsKey(index)) {
-      Navigator.pushReplacementNamed(context, routes[index]!);
-    } else if (index == 1) {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RestaurantScreen()));
+      if (index == 1) {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RestaurantScreen()));
+      } else {
+        Navigator.pushReplacementNamed(context, routes[index]!);
+      }
     }
   }
 
@@ -181,115 +300,159 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
         final groceries = authProvider.groceryProducts;
-        final filteredGroceries = _filterGroceries(groceries);
+        final filteredProducts = _flattenAndFilterGroceries(groceries);
 
         return Scaffold(
+          backgroundColor: doorDashLightGrey,
           appBar: AppBar(
-            title: Text('Groceries', style: GoogleFonts.poppins(color: Colors.white)),
-            backgroundColor: primaryColor,
+            title: Text('Groceries', style: GoogleFonts.poppins(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600)),
+            backgroundColor: doorDashRed,
             elevation: 0,
             actions: [
               IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: authProvider.isLoggedIn ? () => authProvider.fetchGroceryProducts() : null,
+                icon: const Icon(Icons.refresh, color: Colors.white),
+                onPressed: _fetchGroceries,
               ),
+              if (authProvider.isRestaurantOwner)
+                IconButton(
+                  icon: const Icon(Icons.add_circle, color: Colors.white),
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateGroceryProductScreen())),
+                  tooltip: 'Create Product',
+                ),
             ],
           ),
-          body: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [primaryColor.withOpacity(0.1), Colors.white],
-              ),
-            ),
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      TextField(
-                        decoration: InputDecoration(
-                          hintText: 'Search by name...',
-                          hintStyle: GoogleFonts.poppins(color: textColor.withOpacity(0.5)),
-                          prefixIcon: const Icon(Icons.search, color: primaryColor),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          filled: true,
-                          fillColor: Colors.white,
+          body: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    TextField(
+                      decoration: InputDecoration(
+                        hintText: 'Search groceries...',
+                        hintStyle: GoogleFonts.poppins(color: doorDashGrey),
+                        prefixIcon: const Icon(Icons.search, color: doorDashRed),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
                         ),
-                        onChanged: (value) {
-                          setState(() => searchQuery = value);
-                        },
+                        filled: true,
+                        fillColor: Colors.white,
                       ),
-                      const SizedBox(height: 12),
-                      DropdownButtonFormField<String>(
-                        value: selectedLocation,
-                        decoration: InputDecoration(
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          filled: true,
-                          fillColor: Colors.white,
+                      onChanged: (value) {
+                        setState(() => searchQuery = value);
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: selectedLocation,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
                         ),
-                        items: ['All'].map((location) {
-                          return DropdownMenuItem(value: location, child: Text(location, style: GoogleFonts.poppins()));
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() => selectedLocation = value!);
-                        },
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      items: ['All'].map((location) {
+                        return DropdownMenuItem(value: location, child: Text(location, style: GoogleFonts.poppins(color: textColor)));
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() => selectedLocation = value!);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator(color: doorDashRed))
+                    : !authProvider.isLoggedIn
+                        ? Center(child: Text('Please log in to view groceries', style: GoogleFonts.poppins(color: doorDashGrey)))
+                        : groceries.isEmpty
+                            ? Center(
+                                child: Text(
+                                  'No groceries available',
+                                  style: GoogleFonts.poppins(fontSize: 20, color: doorDashGrey),
+                                ),
+                              )
+                            : filteredProducts.isEmpty
+                                ? Center(
+                                    child: Text(
+                                      'No groceries match your search',
+                                      style: GoogleFonts.poppins(fontSize: 20, color: doorDashGrey),
+                                    ),
+                                  )
+                                : GridView.builder(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      crossAxisSpacing: 16,
+                                      mainAxisSpacing: 16,
+                                      childAspectRatio: 0.7,
+                                    ),
+                                    itemCount: filteredProducts.length,
+                                    itemBuilder: (context, index) {
+                                      final product = filteredProducts[index];
+                                      return _buildGroceryItem(product);
+                                    },
+                                  ),
+              ),
+              if (cart.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  color: Colors.white,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Cart: ${cart.length} item${cart.length > 1 ? 's' : ''}',
+                            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
+                          ),
+                          Text(
+                            '₦${cart.fold(0.0, (sum, item) => sum + (item['quantity'] * item['price'])).toStringAsFixed(2)}',
+                            style: GoogleFonts.poppins(fontSize: 14, color: doorDashGrey),
+                          ),
+                        ],
+                      ),
+                      ElevatedButton(
+                        onPressed: _checkout,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: doorDashRed,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                        child: Text('Checkout', style: GoogleFonts.poppins(color: Colors.white, fontSize: 16)),
                       ),
                     ],
                   ),
                 ),
-                Expanded(
-                  child: !authProvider.isLoggedIn
-                      ? const Center(child: Text('Please log in to view groceries'))
-                      : groceries.isEmpty
-                          ? const Center(child: CircularProgressIndicator(color: primaryColor))
-                          : filteredGroceries.isEmpty
-                              ? Center(
-                                  child: Text(
-                                    'No groceries found',
-                                    style: GoogleFonts.poppins(fontSize: 20, color: textColor.withOpacity(0.7)),
-                                  ),
-                                )
-                              : GridView.builder(
-                                  padding: const EdgeInsets.all(16),
-                                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: 2,
-                                    crossAxisSpacing: 16,
-                                    mainAxisSpacing: 16,
-                                    childAspectRatio: 0.75,
-                                  ),
-                                  itemCount: filteredGroceries.length,
-                                  itemBuilder: (context, index) {
-                                    final product = filteredGroceries[index];
-                                    return _buildGroceryItem(product);
-                                  },
-                                ),
-                ),
-                if (cart.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Cart: ${cart.length} items',
-                          style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
-                        ),
-                        ElevatedButton(
-                          onPressed: _checkout,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: primaryColor,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                          child: Text('Checkout', style: GoogleFonts.poppins(color: Colors.white)),
-                        ),
-                      ],
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pushNamed(context, '/my-groceries'),
+                      child: Text(
+                        'View My Orders',
+                        style: GoogleFonts.poppins(color: doorDashRed, fontWeight: FontWeight.w600),
+                      ),
                     ),
-                  ),
-              ],
-            ),
+                    TextButton(
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddGroceryScreen())),
+                      child: Text(
+                        'Add New Order',
+                        style: GoogleFonts.poppins(color: doorDashRed, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
           bottomNavigationBar: BottomNavigationBar(
             items: const [
@@ -301,69 +464,73 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
               BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Owner'),
             ],
             currentIndex: _selectedIndex,
-            selectedItemColor: primaryColor,
-            unselectedItemColor: textColor.withOpacity(0.6),
-            onTap: _onItemTapped,
+            selectedItemColor: doorDashRed,
+            unselectedItemColor: doorDashGrey,
+            backgroundColor: Colors.white,
             type: BottomNavigationBarType.fixed,
+            selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+            unselectedLabelStyle: GoogleFonts.poppins(),
+            onTap: _onItemTapped,
           ),
         );
       },
     );
   }
 
-  Widget _buildGroceryItem(Product product) {
+  Widget _buildGroceryItem(Map<String, dynamic> product) {
     return Card(
-      elevation: 4,
+      elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: Colors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
             child: GestureDetector(
-              onTap: () => _showImageZoomDialog(context, product.imageUrl),
+              onTap: () => _showImageZoomDialog(context, product['image']),
               child: ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                child: product.imageUrl != null
+                child: product['image'] != null
                     ? Image.network(
-                        product.imageUrl!,
+                        product['image']!,
                         fit: BoxFit.cover,
                         height: 150,
                         width: double.infinity,
                         errorBuilder: (context, error, stackTrace) => Container(
                           height: 150,
-                          color: accentColor.withOpacity(0.3),
+                          color: Colors.grey[300],
                           child: const Icon(Icons.image_not_supported, color: Colors.white, size: 50),
                         ),
                       )
                     : Container(
                         height: 150,
-                        color: accentColor.withOpacity(0.3),
+                        color: Colors.grey[300],
                         child: const Icon(Icons.image_not_supported, color: Colors.white, size: 50),
                       ),
               ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(12.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  product.name,
-                  style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor),
+                  product['name'] ?? 'Unnamed',
+                  style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: textColor, fontSize: 16),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '₦${product.price} (Qty: ${product.quantity})',
-                  style: GoogleFonts.poppins(color: textColor.withOpacity(0.7)),
+                  '₦${(product['price'] as num?)?.toStringAsFixed(2) ?? 'N/A'} • Qty: ${product['quantity']?.toString() ?? 'N/A'}',
+                  style: GoogleFonts.poppins(color: doorDashGrey, fontSize: 14),
                 ),
                 const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerRight,
                   child: IconButton(
-                    icon: const Icon(Icons.add_shopping_cart, color: primaryColor),
+                    icon: const Icon(Icons.add_circle, color: doorDashRed, size: 28),
                     onPressed: () => _addToCart(product),
                   ),
                 ),

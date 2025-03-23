@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../auth_provider.dart';
-import '../main.dart' show primaryColor, textColor, accentColor;
+import '../main.dart' show textColor, accentColor;
 import 'restaurant_profile_screen.dart';
 
 class RestaurantScreen extends StatefulWidget {
@@ -13,6 +13,11 @@ class RestaurantScreen extends StatefulWidget {
 }
 
 class _RestaurantScreenState extends State<RestaurantScreen> {
+  static const Color doorDashRed = Color(0xFFEF2A39);
+  static const Color doorDashGrey = Color(0xFF757575);
+  static const Color doorDashLightGrey = Color(0xFFF5F5F5);
+  static const Color doorDashWhite = Colors.white;
+
   late Future<List<dynamic>> _futureRestaurants;
   List<dynamic> _allRestaurants = [];
   List<dynamic> _filteredRestaurants = [];
@@ -68,16 +73,19 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
   }
 
   void _onItemTapped(int index) {
+    if (index == _selectedIndex) return; // Avoid redundant navigation
+
     setState(() => _selectedIndex = index);
 
     final routes = {
       0: '/home',
+      1: '/restaurants', // Current screen, no navigation needed
       2: '/orders',
       3: '/profile',
       4: '/restaurant-owner',
     };
 
-    if (index != 1 && routes.containsKey(index)) {
+    if (routes.containsKey(index) && index != 1) {
       Navigator.pushReplacementNamed(context, routes[index]!);
     }
   }
@@ -92,30 +100,48 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: doorDashLightGrey,
       appBar: AppBar(
-        title: Text('Restaurants', style: GoogleFonts.poppins(color: Colors.white)),
-        backgroundColor: primaryColor,
+        backgroundColor: doorDashRed,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: () => setState(() => _futureRestaurants = _fetchRestaurants()),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: doorDashWhite, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Restaurants',
+          style: GoogleFonts.poppins(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+            color: doorDashWhite,
           ),
+        ),
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [doorDashRed, doorDashRed.withOpacity(0.9)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+        ),
+        actions: [
           Consumer<AuthProvider>(
             builder: (context, auth, child) => IconButton(
               icon: Stack(
                 children: [
-                  const Icon(Icons.shopping_cart, color: Colors.white),
+                  const Icon(Icons.shopping_cart, color: doorDashWhite),
                   if (auth.cartItems.isNotEmpty)
                     Positioned(
                       right: 0,
                       top: 0,
                       child: CircleAvatar(
                         radius: 8,
-                        backgroundColor: accentColor,
+                        backgroundColor: Colors.white,
                         child: Text(
                           '${auth.cartItems.length}',
-                          style: GoogleFonts.poppins(fontSize: 10, color: Colors.white),
+                          style: GoogleFonts.poppins(fontSize: 10, color: doorDashRed),
                         ),
                       ),
                     ),
@@ -130,29 +156,37 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
         future: _futureRestaurants,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator(color: doorDashRed));
           }
 
           if (snapshot.hasError || !snapshot.hasData) {
             return Center(
               child: Text(
                 'Error loading restaurants',
-                style: GoogleFonts.poppins(color: textColor),
+                style: GoogleFonts.poppins(fontSize: 18, color: doorDashGrey),
               ),
             );
           }
 
           if (snapshot.data!.isEmpty) {
             return Center(
-              child: Text(
-                'No restaurants available',
-                style: GoogleFonts.poppins(color: textColor),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.restaurant, size: 100, color: doorDashGrey.withOpacity(0.3)),
+                  const SizedBox(height: 20),
+                  Text(
+                    'No restaurants available',
+                    style: GoogleFonts.poppins(fontSize: 18, color: doorDashGrey),
+                  ),
+                ],
               ),
             );
           }
 
           return RefreshIndicator(
             onRefresh: _fetchRestaurants,
+            color: doorDashRed,
             child: Column(
               children: [
                 _buildSearchFilters(),
@@ -165,63 +199,117 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.restaurant), label: 'Restaurants'),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Orders'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-          BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Owner'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Home',
+            tooltip: 'Go to Home',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.restaurant),
+            label: 'Restaurants',
+            tooltip: 'Restaurants',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.shopping_cart),
+            label: 'Orders',
+            tooltip: 'View Orders',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person),
+            label: 'Profile',
+            tooltip: 'Your Profile',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.store),
+            label: 'Owner',
+            tooltip: 'Restaurant Owner Dashboard',
+          ),
         ],
         currentIndex: _selectedIndex,
-        selectedItemColor: primaryColor,
-        unselectedItemColor: textColor.withOpacity(0.6),
-        onTap: _onItemTapped,
+        selectedItemColor: doorDashRed,
+        unselectedItemColor: doorDashGrey.withOpacity(0.6),
+        backgroundColor: doorDashWhite,
+        elevation: 12, // Increased elevation for a more pronounced shadow
         type: BottomNavigationBarType.fixed,
+        selectedLabelStyle: GoogleFonts.poppins(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: GoogleFonts.poppins(
+          fontSize: 12,
+          fontWeight: FontWeight.w400,
+        ),
+        showUnselectedLabels: true, // Ensure all labels are visible
+        onTap: _onItemTapped,
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => setState(() => _futureRestaurants = _fetchRestaurants()),
+        backgroundColor: doorDashRed,
+        child: const Icon(Icons.refresh, color: doorDashWhite),
+        tooltip: 'Refresh Restaurants',
       ),
     );
   }
 
   Widget _buildSearchFilters() {
     return Padding(
-      padding: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.all(16.0),
       child: Column(
         children: [
-          TextField(
-            controller: _searchController,
-            decoration: _inputDecoration('Search by name', Icons.search),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _locationController,
-            decoration: _inputDecoration('Filter by location', Icons.location_on),
-          ),
+          _buildSearchField(_searchController, 'Search by name', Icons.search),
+          const SizedBox(height: 12),
+          _buildSearchField(_locationController, 'Filter by location', Icons.location_on),
         ],
       ),
     );
   }
 
-  InputDecoration _inputDecoration(String label, IconData icon) {
-    return InputDecoration(
-      labelText: label,
-      labelStyle: GoogleFonts.poppins(color: textColor.withOpacity(0.7)),
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      prefixIcon: Icon(icon, color: primaryColor),
-      suffixIcon: _searchController.text.isNotEmpty
-          ? IconButton(
-              icon: const Icon(Icons.clear, color: primaryColor),
-              onPressed: () => _searchController.clear(),
-            )
-          : null,
+  Widget _buildSearchField(TextEditingController controller, String label, IconData icon) {
+    return Container(
+      decoration: BoxDecoration(
+        color: doorDashWhite,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: TextField(
+        controller: controller,
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: GoogleFonts.poppins(color: doorDashGrey, fontSize: 14),
+          prefixIcon: Icon(icon, color: doorDashRed),
+          suffixIcon: controller.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.clear, color: doorDashRed),
+                  onPressed: () => controller.clear(),
+                )
+              : null,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(vertical: 14),
+          filled: true,
+          fillColor: doorDashWhite,
+        ),
+        style: GoogleFonts.poppins(fontSize: 16, color: textColor),
+      ),
     );
   }
 
   Widget _buildRestaurantGrid() {
     return GridView.builder(
-      padding: const EdgeInsets.all(8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
-        childAspectRatio: 0.75,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.7,
       ),
       itemCount: _getPaginatedRestaurants().length,
       itemBuilder: (context, index) => _buildRestaurantCard(_getPaginatedRestaurants()[index]),
@@ -235,15 +323,24 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
         context,
         MaterialPageRoute(builder: (_) => RestaurantProfileScreen(restaurant: restaurant)),
       ),
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        decoration: BoxDecoration(
+          color: doorDashWhite,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildRestaurantImage(restaurant['image']),
             Padding(
-              padding: const EdgeInsets.all(8.0),
+              padding: const EdgeInsets.all(12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -276,18 +373,16 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
           if (loadingProgress == null) return child;
           return Container(
             height: 100,
-            width: double.infinity,
-            color: Colors.grey[300],
-            child: const Center(child: CircularProgressIndicator()),
+            color: doorDashLightGrey,
+            child: Center(child: CircularProgressIndicator(color: doorDashRed)),
           );
         },
         errorBuilder: (context, error, stackTrace) {
           debugPrint('Image load error: $error');
           return Container(
             height: 100,
-            width: double.infinity,
-            color: Colors.grey[300],
-            child: const Icon(Icons.broken_image, color: Colors.grey),
+            color: doorDashLightGrey,
+            child: const Icon(Icons.broken_image, color: doorDashGrey),
           );
         },
       ),
@@ -306,7 +401,7 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
         ),
         Text(
           restaurant['address'] ?? 'No address',
-          style: GoogleFonts.poppins(fontSize: 12, color: textColor.withOpacity(0.7)),
+          style: GoogleFonts.poppins(fontSize: 12, color: doorDashGrey),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -319,14 +414,10 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
       builder: (context, auth, child) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Menu',
-            style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold, color: textColor),
-          ),
           if (menus.isEmpty)
             Text(
               'No menu items',
-              style: GoogleFonts.poppins(fontSize: 12, color: textColor.withOpacity(0.7)),
+              style: GoogleFonts.poppins(fontSize: 12, color: doorDashGrey),
             )
           else
             ...menus.take(2).map((item) => _buildMenuItem(item, auth, context)),
@@ -340,31 +431,43 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
     final itemPrice = (item['price'] as num?)?.toDouble() ?? 0.0;
     final restaurantName = item['restaurantName'] ?? 'Unknown';
 
-    return ListTile(
-      dense: true,
-      contentPadding: EdgeInsets.zero,
-      title: Text(
-        itemName,
-        style: GoogleFonts.poppins(fontSize: 12, color: textColor),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Text(
-        '\$${itemPrice.toStringAsFixed(2)}',
-        style: GoogleFonts.poppins(fontSize: 12, color: accentColor),
-      ),
-      trailing: IconButton(
-        icon: const Icon(Icons.add_shopping_cart, color: accentColor),
-        onPressed: () {
-          auth.addToCart(itemName, itemPrice, restaurantName: restaurantName);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('$itemName added to cart'),
-              backgroundColor: accentColor,
-              duration: const Duration(seconds: 2),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  itemName,
+                  style: GoogleFonts.poppins(fontSize: 12, color: textColor),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '\$${itemPrice.toStringAsFixed(2)}',
+                  style: GoogleFonts.poppins(fontSize: 12, color: doorDashRed),
+                ),
+              ],
             ),
-          );
-        },
+          ),
+          IconButton(
+            icon: const Icon(Icons.add_shopping_cart, color: doorDashRed, size: 20),
+            onPressed: () {
+              auth.addToCart(itemName, itemPrice, restaurantName: restaurantName);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('$itemName added to cart', style: GoogleFonts.poppins(color: doorDashWhite)),
+                  backgroundColor: doorDashRed,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  duration: const Duration(seconds: 2),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }
@@ -372,27 +475,27 @@ class _RestaurantScreenState extends State<RestaurantScreen> {
   Widget _buildPaginationControls() {
     final totalPages = (_filteredRestaurants.length / _itemsPerPage).ceil();
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           IconButton(
-            icon: const Icon(Icons.arrow_back_ios, color: primaryColor),
+            icon: const Icon(Icons.arrow_back_ios, color: doorDashRed),
             onPressed: _currentPage > 1 ? () => setState(() => _currentPage--) : null,
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: primaryColor,
+              color: doorDashRed,
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               '$_currentPage / $totalPages',
-              style: GoogleFonts.poppins(fontSize: 14, color: Colors.white),
+              style: GoogleFonts.poppins(fontSize: 14, color: doorDashWhite),
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.arrow_forward_ios, color: primaryColor),
+            icon: const Icon(Icons.arrow_forward_ios, color: doorDashRed),
             onPressed: _currentPage < totalPages ? () => setState(() => _currentPage++) : null,
           ),
         ],

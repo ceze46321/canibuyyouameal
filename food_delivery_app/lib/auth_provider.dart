@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:chiw_express/models/cart.dart';
 import 'package:chiw_express/services/api_service.dart';
-import 'package:chiw_express/models/product_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'dart:html' as html if (dart.library.html) 'dart:html';
 
 class AuthProvider with ChangeNotifier {
@@ -13,7 +13,9 @@ class AuthProvider with ChangeNotifier {
   String? _role;
   String? _deliveryLocation;
   List<CartItem> _cartItems = [];
-  List<Product> _groceryProducts = [];
+  List<Map<String, dynamic>> _groceryProducts = [];
+  List<Map<String, dynamic>> _userGroceries = [];
+  bool _isLoadingGroceries = false;
   static const bool _isWeb = identical(0, 0.0);
 
   // Getters
@@ -26,28 +28,55 @@ class AuthProvider with ChangeNotifier {
   List<CartItem> get cartItems => _cartItems;
   double get cartTotal => _cartItems.fold(0, (sum, item) => sum + (item.price * item.quantity));
   bool get isRestaurantOwner => _role == 'restaurant_owner';
-  List<Product> get groceryProducts => _groceryProducts;
+  List<Map<String, dynamic>> get groceryProducts => _groceryProducts;
+  List<Map<String, dynamic>> get userGroceries => _userGroceries;
+  bool get isLoadingGroceries => _isLoadingGroceries;
+  ApiService get apiService => _apiService;
 
   AuthProvider() {
     loadToken();
   }
 
   Future<void> loadToken() async {
+    debugPrint('Loading token...');
     if (_isWeb) {
       _token = html.window.localStorage['auth_token'];
     } else {
       final prefs = await SharedPreferences.getInstance();
       _token = prefs.getString('auth_token');
     }
+    debugPrint('Token loaded: $_token');
     if (_token != null) {
-      _apiService.setToken(_token!);
-      await getProfile();
-      await fetchGroceryProducts();
+      await _apiService.setToken(_token!);
+      _fetchUserData();
     }
     notifyListeners();
   }
 
-  // Cart Management Methods
+  Future<void> _fetchUserData() async {
+    if (!isLoggedIn) return;
+    try {
+      await getProfile();
+      debugPrint('Profile fetched successfully');
+    } catch (e) {
+      debugPrint('Error fetching profile: $e');
+    }
+    try {
+      await fetchGroceryProducts();
+      debugPrint('Grocery products fetched successfully');
+    } catch (e) {
+      debugPrint('Error fetching grocery products: $e');
+    }
+    try {
+      await fetchUserGroceries();
+      debugPrint('User groceries fetched successfully');
+    } catch (e) {
+      debugPrint('Error fetching user groceries: $e');
+    }
+    notifyListeners();
+  }
+
+  // Cart Management Methods (unchanged)
   void addToCart(String name, double price, {String? restaurantName, String? id}) {
     final itemId = id ?? name;
     final existingIndex = _cartItems.indexWhere((i) => i.id == itemId);
@@ -109,23 +138,22 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Authentication Methods
+  // Authentication Methods (unchanged)
   Future<Map<String, dynamic>> register(String name, String email, String password, String role) async {
     try {
       final response = await _apiService.register(name, email, password, role);
       _token = response['token'];
+      await _persistToken(_token!);
+      await _apiService.setToken(_token!);
       _name = response['user']['name'] ?? name;
       _email = response['user']['email'] ?? email;
       _role = response['user']['role'] ?? role;
       _deliveryLocation = response['user']['delivery_location'];
-      await _persistToken(_token!);
-      _apiService.setToken(_token!);
-      print('AuthProvider: Register Successful - Token: $_token, Name: $_name, Role: $_role, Delivery Location: $_deliveryLocation');
-      await fetchGroceryProducts();
+      _fetchUserData();
       notifyListeners();
       return response;
     } catch (e) {
-      print('AuthProvider: Register Error: $e');
+      debugPrint('Register failed: $e');
       rethrow;
     }
   }
@@ -134,18 +162,17 @@ class AuthProvider with ChangeNotifier {
     try {
       final response = await _apiService.login(email, password);
       _token = response['token'];
+      await _persistToken(_token!);
+      await _apiService.setToken(_token!);
       _name = response['user']['name'];
       _email = response['user']['email'];
       _role = response['user']['role'];
       _deliveryLocation = response['user']['delivery_location'];
-      await _persistToken(_token!);
-      _apiService.setToken(_token!);
-      print('AuthProvider: Login Successful - Token: $_token, Name: $_name, Role: $_role, Delivery Location: $_deliveryLocation');
-      await fetchGroceryProducts();
+      _fetchUserData();
       notifyListeners();
       return response;
     } catch (e) {
-      print('AuthProvider: Login Error: $e');
+      debugPrint('Login failed: $e');
       rethrow;
     }
   }
@@ -154,18 +181,17 @@ class AuthProvider with ChangeNotifier {
     try {
       final response = await _apiService.loginWithGoogle(email, accessToken);
       _token = response['token'];
+      await _persistToken(_token!);
+      await _apiService.setToken(_token!);
       _name = response['user']['name'];
       _email = response['user']['email'];
       _role = response['user']['role'];
       _deliveryLocation = response['user']['delivery_location'];
-      await _persistToken(_token!);
-      _apiService.setToken(_token!);
-      print('AuthProvider: Google Login Successful - Token: $_token, Name: $_name, Role: $_role, Delivery Location: $_deliveryLocation');
-      await fetchGroceryProducts();
+      _fetchUserData();
       notifyListeners();
       return response;
     } catch (e) {
-      print('AuthProvider: Google Login Error: $e');
+      debugPrint('Google login failed: $e');
       rethrow;
     }
   }
@@ -180,16 +206,16 @@ class AuthProvider with ChangeNotifier {
       _deliveryLocation = null;
       _cartItems.clear();
       _groceryProducts.clear();
+      _userGroceries.clear();
       if (_isWeb) {
         html.window.localStorage.remove('auth_token');
       } else {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('auth_token');
       }
-      print('AuthProvider: Logout Successful');
       notifyListeners();
     } catch (e) {
-      print('AuthProvider: Logout Error: $e');
+      debugPrint('Logout failed: $e');
       rethrow;
     }
   }
@@ -201,26 +227,29 @@ class AuthProvider with ChangeNotifier {
       _email = response['email'];
       _role = response['role'];
       _deliveryLocation = response['delivery_location'];
-      print('AuthProvider: Profile Fetched - Name: $_name, Role: $_role, Delivery Location: $_deliveryLocation');
       notifyListeners();
       return response;
     } catch (e) {
-      print('AuthProvider: Get Profile Error: $e');
+      debugPrint('Get profile failed: $e');
       rethrow;
     }
   }
 
-  Future<void> updateProfile(String name, String email, {String? deliveryLocation}) async {
+  Future<void> updateProfile(String name, String email, {String? deliveryLocation, String? role}) async {
     try {
-      final response = await _apiService.updateProfile(name, email, deliveryLocation: deliveryLocation);
+      final response = await _apiService.updateProfile(
+        name,
+        email,
+        deliveryLocation: deliveryLocation,
+        role: role, // Pass role to API
+      );
       _name = response['user']['name'];
       _email = response['user']['email'];
       _role = response['user']['role'];
       _deliveryLocation = response['user']['delivery_location'];
-      print('AuthProvider: Profile Updated - Name: $_name, Delivery Location: $_deliveryLocation');
       notifyListeners();
     } catch (e) {
-      print('AuthProvider: Update Profile Error: $e');
+      debugPrint('Update profile failed: $e');
       rethrow;
     }
   }
@@ -229,42 +258,58 @@ class AuthProvider with ChangeNotifier {
     try {
       final response = await _apiService.upgradeRole(newRole);
       _role = newRole;
-      print('AuthProvider: Role Upgraded to $_role');
       notifyListeners();
       return response;
     } catch (e) {
-      print('AuthProvider: Upgrade Role Error: $e');
+      debugPrint('Upgrade role failed: $e');
       rethrow;
     }
   }
 
-  // Grocery Product Fetching
-  Future<void> fetchGroceryProducts() async {
+  // Grocery Product Management (unchanged)
+  Future<List<Map<String, dynamic>>> fetchGroceryProducts() async {
     try {
       final productsData = await _apiService.fetchGroceryProducts();
-      print('AuthProvider: Raw products data: $productsData');
-      _groceryProducts = productsData
-          .expand((grocery) => (grocery['items'] as List)
-              .map((item) => Product.fromJson(item, groceryId: grocery['id'].toString())))
-          .toList();
-      print('AuthProvider: Mapped products: ${_groceryProducts.map((p) => p.name).toList()}');
+      debugPrint('Raw grocery products data: $productsData');
+      if (productsData == null || productsData.isEmpty) {
+        _groceryProducts = [];
+      } else {
+        _groceryProducts = List<Map<String, dynamic>>.from(productsData);
+      }
+      debugPrint('Parsed grocery products: $_groceryProducts');
       notifyListeners();
+      return _groceryProducts;
     } catch (e) {
-      print('AuthProvider: Fetch Grocery Products Error: $e');
+      debugPrint('Fetch grocery products failed: $e');
       _groceryProducts = [];
       notifyListeners();
+      return _groceryProducts;
     }
   }
 
   Future<Map<String, dynamic>> createGrocery(List<Map<String, dynamic>> items) async {
+    if (!isLoggedIn) throw Exception('User not authenticated');
     try {
       final response = await _apiService.createGrocery(items);
-      print('AuthProvider: Grocery Created - Response: $response');
       await fetchGroceryProducts();
+      await fetchUserGroceries();
       notifyListeners();
       return response;
     } catch (e) {
-      print('AuthProvider: Create Grocery Error: $e');
+      debugPrint('Create grocery failed: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> deleteGroceryProduct(String groceryId) async {
+    if (!isLoggedIn) throw Exception('User not authenticated');
+    try {
+      await _apiService.deleteGrocery(groceryId);
+      await fetchGroceryProducts();
+      await fetchUserGroceries();
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Delete grocery product failed: $e');
       rethrow;
     }
   }
@@ -272,16 +317,40 @@ class AuthProvider with ChangeNotifier {
   Future<Map<String, dynamic>> initiateCheckout(String groceryId, {String paymentMethod = 'stripe'}) async {
     try {
       final response = await _apiService.initiateCheckout(groceryId, paymentMethod: paymentMethod);
-      print('AuthProvider: Checkout Initiated for Grocery $groceryId with $paymentMethod - Response: $response');
       notifyListeners();
-      return response; // Returns {client_secret, payment_method} or {payment_link, payment_method}
+      return response;
     } catch (e) {
-      print('AuthProvider: Initiate Checkout Error: $e');
+      debugPrint('Initiate checkout failed: $e');
       rethrow;
     }
   }
 
-  // Restaurant and Order Management
+  Future<void> fetchUserGroceries() async {
+    if (!isLoggedIn) return;
+    _isLoadingGroceries = true;
+    notifyListeners();
+
+    try {
+      final response = await _apiService.fetchUserGroceries();
+      _userGroceries = List<Map<String, dynamic>>.from(response).map((grocery) {
+        return {
+          'id': grocery['id'],
+          'total_price': grocery['total_amount'],
+          'status': grocery['status'],
+          'items': grocery['items'],
+          'created_at': grocery['created_at'],
+        };
+      }).toList();
+    } catch (e) {
+      debugPrint('Fetch user groceries failed: $e');
+      _userGroceries = [];
+    } finally {
+      _isLoadingGroceries = false;
+      notifyListeners();
+    }
+  }
+
+  // Restaurant and Order Management (unchanged)
   Future<Map<String, dynamic>> addRestaurant(
     String name,
     String address,
@@ -305,37 +374,28 @@ class AuthProvider with ChangeNotifier {
         image: image,
         menuItems: menuItems,
       );
-      print('AuthProvider: Add Restaurant Response: $response');
       notifyListeners();
       return response;
     } catch (e) {
-      print('AuthProvider: Add Restaurant Error: $e');
+      debugPrint('Add restaurant failed: $e');
       rethrow;
     }
   }
 
   Future<List<dynamic>> getRestaurants() async {
     try {
-      final result = await _apiService.getRestaurantsFromApi();
-      print('AuthProvider: Fetched Restaurants: $result');
-      return result;
+      return await _apiService.getRestaurantsFromApi();
     } catch (e) {
-      print('AuthProvider: Get Restaurants Error: $e');
+      debugPrint('Get restaurants failed: $e');
       rethrow;
     }
   }
 
   Future<List<dynamic>> getRestaurantOrders() async {
     try {
-      final result = await _apiService.getRestaurantOrders();
-      if (result.isEmpty) {
-        print('AuthProvider: No restaurant orders found');
-      } else {
-        print('AuthProvider: Fetched Restaurant Orders: $result');
-      }
-      return result;
+      return await _apiService.getRestaurantOrders();
     } catch (e) {
-      print('AuthProvider: Get Restaurant Orders Error: $e');
+      debugPrint('Get restaurant orders failed: $e');
       rethrow;
     }
   }
@@ -343,25 +403,18 @@ class AuthProvider with ChangeNotifier {
   Future<void> updateOrderStatus(String orderId, String status) async {
     try {
       await _apiService.updateOrderStatus(orderId, status);
-      print('AuthProvider: Updated Order $orderId to $status');
       notifyListeners();
     } catch (e) {
-      print('AuthProvider: Update Order Status Error: $e');
+      debugPrint('Update order status failed: $e');
       rethrow;
     }
   }
 
   Future<List<dynamic>> getOrders() async {
     try {
-      final result = await _apiService.getOrders();
-      if (result.isEmpty) {
-        print('AuthProvider: No orders found for user');
-      } else {
-        print('AuthProvider: Fetched Orders: $result');
-      }
-      return result;
+      return await _apiService.getOrders();
     } catch (e) {
-      print('AuthProvider: Get Orders Error: $e');
+      debugPrint('Get orders failed: $e');
       rethrow;
     }
   }
@@ -369,21 +422,18 @@ class AuthProvider with ChangeNotifier {
   Future<void> cancelOrder(String orderId) async {
     try {
       await _apiService.cancelOrder(orderId);
-      print('AuthProvider: Cancelled Order $orderId');
       notifyListeners();
     } catch (e) {
-      print('AuthProvider: Cancel Order Error: $e');
+      debugPrint('Cancel order failed: $e');
       rethrow;
     }
   }
 
   Future<Map<String, dynamic>> getOrderTracking(String trackingNumber) async {
     try {
-      final result = await _apiService.getOrderTracking(trackingNumber);
-      print('AuthProvider: Fetched Tracking for $trackingNumber: $result');
-      return result;
+      return await _apiService.getOrderTracking(trackingNumber);
     } catch (e) {
-      print('AuthProvider: Get Order Tracking Error: $e');
+      debugPrint('Get order tracking failed: $e');
       rethrow;
     }
   }
@@ -398,10 +448,9 @@ class AuthProvider with ChangeNotifier {
         'payment_method': paymentMethod,
       };
       final response = await _apiService.placeOrder(orderData);
-      print('AuthProvider: Order Initiated with $paymentMethod - Response: $response');
       return response;
     } catch (e) {
-      print('AuthProvider: Initiate Order Error: $e');
+      debugPrint('Initiate order failed: $e');
       rethrow;
     }
   }
@@ -412,10 +461,9 @@ class AuthProvider with ChangeNotifier {
       if (status == 'completed') {
         clearCart();
       }
-      print('AuthProvider: Order Payment Confirmed - Order ID: $orderId, Status: $status');
       notifyListeners();
     } catch (e) {
-      print('AuthProvider: Confirm Order Payment Error: $e');
+      debugPrint('Confirm order payment failed: $e');
       rethrow;
     }
   }
@@ -428,17 +476,14 @@ class AuthProvider with ChangeNotifier {
         if (order != null) {
           final status = order['status'] as String?;
           if (status == 'completed' || status == 'cancelled' || status == 'failed') {
-            print('AuthProvider: Order $orderId status updated to $status after polling');
             return status;
           }
         }
-        print('AuthProvider: Polling attempt $attempt for Order $orderId - No status update yet');
         await Future.delayed(interval);
       }
-      print('AuthProvider: Polling timed out for Order $orderId');
       return null;
     } catch (e) {
-      print('AuthProvider: Poll Order Status Error: $e');
+      debugPrint('Poll order status failed: $e');
       rethrow;
     }
   }

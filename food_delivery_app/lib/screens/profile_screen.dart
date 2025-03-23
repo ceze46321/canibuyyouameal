@@ -3,8 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import '../auth_provider.dart';
-import '../main.dart' show primaryColor, textColor, accentColor, secondaryColor;
+import '../main.dart' show textColor;
 import 'package:flutter_animate/flutter_animate.dart';
+import 'restaurant_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -16,10 +17,17 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  String? _selectedRole;
   bool _isLoading = false;
-  int _selectedIndex = 3;
+  int _selectedIndex = 4;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
+
+  static const Color doorDashRed = Color(0xFFEF2A39);
+  static const Color doorDashGrey = Color(0xFF757575);
+  static const Color doorDashLightGrey = Color(0xFFF5F5F5);
+
+  static const List<String> _roleOptions = ['customer', 'dasher', 'restaurant_owner'];
 
   @override
   void initState() {
@@ -27,6 +35,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final auth = Provider.of<AuthProvider>(context, listen: false);
     _nameController.text = auth.name ?? '';
     _emailController.text = auth.email ?? '';
+    _selectedRole = auth.role ?? 'customer';
     _animationController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -52,10 +61,11 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       if (mounted) {
         _nameController.text = authProvider.name ?? '';
         _emailController.text = authProvider.email ?? '';
+        _selectedRole = authProvider.role ?? 'customer';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Profile refreshed!', style: GoogleFonts.poppins()),
-            backgroundColor: accentColor,
+            content: Text('Profile refreshed!', style: GoogleFonts.poppins(color: Colors.white)),
+            backgroundColor: doorDashRed,
           ),
         );
       }
@@ -80,10 +90,10 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     setState(() => _isLoading = true);
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.updateProfile(_nameController.text, _emailController.text);
+      await authProvider.updateProfile(_nameController.text, _emailController.text, role: _selectedRole);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Profile updated!', style: GoogleFonts.poppins()), backgroundColor: accentColor),
+          SnackBar(content: Text('Profile updated!', style: GoogleFonts.poppins(color: Colors.white)), backgroundColor: doorDashRed),
         );
       }
     } catch (e) {
@@ -101,19 +111,19 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text('Confirm Logout', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor)),
-        content: Text('Ready to leave your food adventure?', style: GoogleFonts.poppins(color: textColor.withOpacity(0.7))),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: Text('Confirm Logout', style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: textColor)),
+        content: Text('Are you sure you want to log out?', style: GoogleFonts.poppins(color: doorDashGrey)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: GoogleFonts.poppins(color: textColor)),
+            child: Text('Cancel', style: GoogleFonts.poppins(color: doorDashGrey)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              backgroundColor: doorDashRed,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             child: Text('Logout', style: GoogleFonts.poppins(color: Colors.white)),
           ),
@@ -139,21 +149,20 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
-    switch (index) {
-      case 0:
-        Navigator.pushReplacementNamed(context, '/home');
-        break;
-      case 1:
-        Navigator.pushReplacementNamed(context, '/restaurants');
-        break;
-      case 2:
-        Navigator.pushReplacementNamed(context, '/orders');
-        break;
-      case 3:
-        break;
-      case 4:
-        Navigator.pushReplacementNamed(context, '/restaurant-owner');
-        break;
+    final routes = {
+      0: '/home',
+      1: '/restaurants',
+      2: '/groceries',
+      3: '/orders',
+      4: '/profile',
+      5: '/restaurant-owner',
+    };
+    if (index != 4 && routes.containsKey(index)) {
+      if (index == 1) {
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RestaurantScreen()));
+      } else {
+        Navigator.pushReplacementNamed(context, routes[index]!);
+      }
     }
   }
 
@@ -161,204 +170,192 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
     return Scaffold(
-      body: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  primaryColor.withOpacity(0.6),
-                  secondaryColor.withOpacity(0.2),
-                  const Color(0xFFF5F5F5),
-                ],
-              ),
-            ),
-            child: CustomPaint(painter: WavePainter()),
+      backgroundColor: doorDashLightGrey,
+      appBar: AppBar(
+        title: Text(
+          'Profile',
+          style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.white),
+        ),
+        backgroundColor: doorDashRed,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _getProfile,
           ),
-          SafeArea(
-            child: _isLoading
-                ? Center(child: SpinKitFadingCircle(color: primaryColor, size: 50))
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.all(16.0),
+        ],
+      ),
+      body: _isLoading
+          ? Center(child: SpinKitFadingCircle(color: doorDashRed, size: 50))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  FadeTransition(
+                    opacity: _fadeAnimation,
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // Profile Header
-                        FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: Column(
-                            children: [
-                              CircleAvatar(
-                                radius: 60,
-                                backgroundColor: primaryColor.withOpacity(0.2),
-                                child: Text(
-                                  auth.name?.substring(0, 1).toUpperCase() ?? 'U',
-                                  style: GoogleFonts.poppins(fontSize: 48, color: primaryColor, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                auth.name ?? 'User',
-                                style: GoogleFonts.poppins(fontSize: 28, fontWeight: FontWeight.bold, color: textColor),
-                              ),
-                              Text(
-                                auth.role ?? 'Foodie',
-                                style: GoogleFonts.poppins(fontSize: 16, color: textColor.withOpacity(0.7), fontStyle: FontStyle.italic),
-                              ),
-                            ],
+                        CircleAvatar(
+                          radius: 50,
+                          backgroundColor: doorDashRed.withOpacity(0.1),
+                          child: Text(
+                            auth.name?.substring(0, 1).toUpperCase() ?? 'U',
+                            style: GoogleFonts.poppins(fontSize: 36, color: doorDashRed, fontWeight: FontWeight.bold),
                           ),
                         ),
-                        const SizedBox(height: 32),
-
-                        // Profile Card
-                        FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: Card(
-                            elevation: 6,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                            shadowColor: primaryColor.withOpacity(0.2),
-                            child: Padding(
-                              padding: const EdgeInsets.all(20.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Your Details',
-                                    style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold, color: textColor),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  TextField(
-                                    controller: _nameController,
-                                    decoration: InputDecoration(
-                                      labelText: 'Name',
-                                      labelStyle: GoogleFonts.poppins(color: textColor.withOpacity(0.7)),
-                                      prefixIcon: const Icon(Icons.person, color: Color(0xFFFF7043)),
-                                      filled: true,
-                                      fillColor: const Color(0xFFF5F5F5),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                                    ),
-                                    style: GoogleFonts.poppins(color: textColor),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  TextField(
-                                    controller: _emailController,
-                                    decoration: InputDecoration(
-                                      labelText: 'Email',
-                                      labelStyle: GoogleFonts.poppins(color: textColor.withOpacity(0.7)),
-                                      prefixIcon: const Icon(Icons.email, color: Color(0xFFFF7043)),
-                                      filled: true,
-                                      fillColor: const Color(0xFFF5F5F5),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                                    ),
-                                    style: GoogleFonts.poppins(color: textColor),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Row(
-                                    children: [
-                                      const Icon(Icons.security, color: Color(0xFFFF7043)),
-                                      const SizedBox(width: 12),
-                                      Text(
-                                        'Role: ${auth.role ?? 'Unknown'}',
-                                        style: GoogleFonts.poppins(fontSize: 16, color: textColor),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                        const SizedBox(height: 12),
+                        Text(
+                          auth.name ?? 'User',
+                          style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.w600, color: textColor),
                         ),
-                        const SizedBox(height: 32),
-
-                        // Action Buttons
-                        FadeTransition(
-                          opacity: _fadeAnimation,
-                          child: Column(
-                            children: [
-                              ElevatedButton(
-                                onPressed: _getProfile,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: primaryColor,
-                                  foregroundColor: Colors.white.withOpacity(0.2),
-                                  minimumSize: const Size(double.infinity, 56),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  elevation: 4,
-                                ),
-                                child: Text('Refresh Profile', style: GoogleFonts.poppins(fontSize: 16, color: Colors.white)),
-                              ).animate().scale(duration: 300.ms),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _updateProfile,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: accentColor,
-                                  foregroundColor: Colors.white.withOpacity(0.2),
-                                  minimumSize: const Size(double.infinity, 56),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  elevation: 4,
-                                ),
-                                child: Text('Update Profile', style: GoogleFonts.poppins(fontSize: 16, color: Colors.white)),
-                              ).animate().scale(duration: 300.ms),
-                              const SizedBox(height: 16),
-                              OutlinedButton(
-                                onPressed: _logout,
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: primaryColor, width: 2),
-                                  foregroundColor: primaryColor.withOpacity(0.2),
-                                  minimumSize: const Size(double.infinity, 56),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                ),
-                                child: Text('Logout', style: GoogleFonts.poppins(fontSize: 16, color: primaryColor)),
-                              ).animate().scale(duration: 300.ms),
-                            ],
-                          ),
+                        Text(
+                          _selectedRole ?? 'customer',
+                          style: GoogleFonts.poppins(fontSize: 16, color: doorDashGrey),
                         ),
                       ],
                     ),
                   ),
-          ),
-        ],
-      ),
+                  const SizedBox(height: 24),
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      color: Colors.white,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Your Details',
+                              style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: textColor),
+                            ),
+                            const SizedBox(height: 16),
+                            _buildTextField(
+                              controller: _nameController,
+                              label: 'Name',
+                              icon: Icons.person,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildTextField(
+                              controller: _emailController,
+                              label: 'Email',
+                              icon: Icons.email,
+                            ),
+                            const SizedBox(height: 12),
+                            DropdownButtonFormField<String>(
+                              value: _selectedRole,
+                              decoration: _inputDecoration('Role', Icons.security),
+                              items: _roleOptions
+                                  .map((role) => DropdownMenuItem(
+                                        value: role,
+                                        child: Text(role.capitalize(), style: GoogleFonts.poppins(color: textColor)),
+                                      ))
+                                  .toList(),
+                              onChanged: (value) => setState(() => _selectedRole = value),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: Column(
+                      children: [
+                        ElevatedButton(
+                          onPressed: _updateProfile,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: doorDashRed,
+                            minimumSize: const Size(double.infinity, 50),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            'Update Profile',
+                            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+                          ),
+                        ).animate().scale(duration: 300.ms),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: _logout,
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: doorDashRed, width: 2),
+                            minimumSize: const Size(double.infinity, 50),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: Text(
+                            'Logout',
+                            style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: doorDashRed),
+                          ),
+                        ).animate().scale(duration: 300.ms),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
       bottomNavigationBar: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.restaurant), label: 'Restaurants'),
+          BottomNavigationBarItem(icon: Icon(Icons.local_grocery_store), label: 'Groceries'),
           BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Orders'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
           BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Owner'),
         ],
         currentIndex: _selectedIndex,
-        selectedItemColor: primaryColor,
-        unselectedItemColor: textColor.withOpacity(0.6),
+        selectedItemColor: doorDashRed,
+        unselectedItemColor: doorDashGrey,
         backgroundColor: Colors.white,
-        elevation: 8,
         type: BottomNavigationBarType.fixed,
+        selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
+        unselectedLabelStyle: GoogleFonts.poppins(),
         onTap: _onItemTapped,
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required String label,
+    required IconData icon,
+    TextEditingController? controller,
+  }) {
+    return TextField(
+      controller: controller,
+      decoration: _inputDecoration(label, icon),
+      style: GoogleFonts.poppins(color: textColor),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: GoogleFonts.poppins(color: doorDashGrey),
+      prefixIcon: Icon(icon, color: doorDashRed),
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: doorDashGrey.withOpacity(0.2)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: BorderSide(color: doorDashGrey.withOpacity(0.2)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: doorDashRed),
       ),
     );
   }
 }
 
-// Wave Painter for Background
-class WavePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = accentColor.withOpacity(0.1)
-      ..style = PaintingStyle.fill;
-
-    final path = Path();
-    path.moveTo(0, size.height * 0.8);
-    path.quadraticBezierTo(size.width * 0.25, size.height * 0.7, size.width * 0.5, size.height * 0.8);
-    path.quadraticBezierTo(size.width * 0.75, size.height * 0.9, size.width, size.height * 0.8);
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
-
-    canvas.drawPath(path, paint);
+extension StringExtension on String {
+  String capitalize() {
+    return "${this[0].toUpperCase()}${substring(1).toLowerCase()}";
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

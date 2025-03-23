@@ -3,8 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
 import '../auth_provider.dart';
-import '../main.dart' show primaryColor, textColor, accentColor, secondaryColor;
-import 'package:flutter_animate/flutter_animate.dart';
+import '../main.dart' show textColor, accentColor;
 
 class OrderScreen extends StatefulWidget {
   final String? orderId;
@@ -16,16 +15,19 @@ class OrderScreen extends StatefulWidget {
   State<OrderScreen> createState() => _OrderScreenState();
 }
 
-class _OrderScreenState extends State<OrderScreen> with SingleTickerProviderStateMixin {
+class _OrderScreenState extends State<OrderScreen> {
+  static const Color doorDashRed = Color(0xFFEF2A39);
+  static const Color doorDashGrey = Color(0xFF757575);
+  static const Color doorDashLightGrey = Color(0xFFF5F5F5);
+  static const Color doorDashWhite = Colors.white;
+
   List<dynamic> orders = [];
   bool isLoading = true;
   int _selectedIndex = 2;
-  late AnimationController _animationController;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 800))..forward();
     _fetchOrders();
     if (widget.initialStatus != null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -37,25 +39,19 @@ class _OrderScreenState extends State<OrderScreen> with SingleTickerProviderStat
                   : widget.initialStatus == 'cancelled'
                       ? 'Payment cancelled. Try again?'
                       : 'Payment failed. Please retry.',
-              style: GoogleFonts.poppins(),
+              style: GoogleFonts.poppins(color: doorDashWhite),
             ),
-            backgroundColor: widget.initialStatus == 'completed' ? accentColor : Colors.redAccent,
-            duration: const Duration(seconds: 3),
+            backgroundColor: widget.initialStatus == 'completed' ? doorDashRed : Colors.redAccent,
             behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         );
       });
     }
   }
 
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
   Future<void> _fetchOrders() async {
+    setState(() => isLoading = true);
     try {
       final auth = Provider.of<AuthProvider>(context, listen: false);
       final fetchedOrders = await auth.getOrders();
@@ -77,7 +73,12 @@ class _OrderScreenState extends State<OrderScreen> with SingleTickerProviderStat
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e', style: GoogleFonts.poppins()), backgroundColor: Colors.redAccent),
+          SnackBar(
+            content: Text('Error: $e', style: GoogleFonts.poppins(color: doorDashWhite)),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
         );
         setState(() => isLoading = false);
       }
@@ -88,18 +89,21 @@ class _OrderScreenState extends State<OrderScreen> with SingleTickerProviderStat
     bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: Text('Cancel Order', style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: textColor)),
-        content: Text('Are you sure you want to cancel this order?', style: GoogleFonts.poppins(color: textColor.withOpacity(0.7))),
+        content: Text('Are you sure you want to cancel this order?', style: GoogleFonts.poppins(color: doorDashGrey)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('No', style: GoogleFonts.poppins(color: textColor)),
+            child: Text('No', style: GoogleFonts.poppins(color: doorDashRed)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            child: Text('Yes', style: GoogleFonts.poppins(color: Colors.white)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: Text('Yes', style: GoogleFonts.poppins(color: doorDashWhite)),
           ),
         ],
       ),
@@ -112,13 +116,23 @@ class _OrderScreenState extends State<OrderScreen> with SingleTickerProviderStat
       await _fetchOrders();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Order cancelled successfully'), backgroundColor: accentColor),
+          SnackBar(
+            content: Text('Order cancelled successfully', style: GoogleFonts.poppins(color: doorDashWhite)),
+            backgroundColor: doorDashRed,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e', style: GoogleFonts.poppins()), backgroundColor: Colors.redAccent),
+          SnackBar(
+            content: Text('Error: $e', style: GoogleFonts.poppins(color: doorDashWhite)),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
         );
       }
     }
@@ -147,87 +161,70 @@ class _OrderScreenState extends State<OrderScreen> with SingleTickerProviderStat
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  primaryColor.withOpacity(0.7),
-                  secondaryColor.withOpacity(0.3),
-                  const Color(0xFFF5F5F5),
-                ],
-              ),
-            ),
-            child: CustomPaint(painter: WavePainter()),
+      backgroundColor: doorDashLightGrey,
+      appBar: AppBar(
+        backgroundColor: doorDashRed,
+        elevation: 0,
+        title: Text(
+          'My Orders',
+          style: GoogleFonts.poppins(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+            color: doorDashWhite,
           ),
-          SafeArea(
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: primaryColor,
-                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
-                    boxShadow: [BoxShadow(color: primaryColor.withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4))],
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'My Orders',
-                        style: GoogleFonts.poppins(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.refresh, color: Colors.white, size: 28),
-                        onPressed: isLoading ? null : _fetchOrders,
-                        tooltip: 'Refresh Orders',
-                      ),
-                    ],
-                  ),
-                ).animate().fadeIn(duration: 600.ms),
-                Expanded(
-                  child: isLoading
-                      ? Center(child: SpinKitPouringHourGlassRefined(color: primaryColor, size: 60))
-                      : orders.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.fastfood, size: 100, color: textColor.withOpacity(0.2)),
-                                  const SizedBox(height: 20),
-                                  Text(
-                                    'No orders yet',
-                                    style: GoogleFonts.poppins(fontSize: 20, color: textColor.withOpacity(0.7)),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  Text(
-                                    'Order some delicious food now!',
-                                    style: GoogleFonts.poppins(fontSize: 14, color: textColor.withOpacity(0.5)),
-                                  ),
-                                ],
-                              ).animate().fadeIn(duration: 800.ms),
-                            )
-                          : RefreshIndicator(
-                              onRefresh: _fetchOrders,
-                              color: primaryColor,
-                              child: ListView.builder(
-                                padding: const EdgeInsets.all(16),
-                                itemCount: orders.length,
-                                itemBuilder: (context, index) {
-                                  final order = orders[index];
-                                  final isHighlighted = widget.orderId != null && order['id'].toString() == widget.orderId;
-                                  return _buildOrderCard(order, isHighlighted);
-                                },
-                              ),
-                            ),
-                ),
-              ],
+        ),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: doorDashWhite, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [doorDashRed, doorDashRed.withOpacity(0.9)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
           ),
-        ],
+        ),
+      ),
+      body: SafeArea(
+        child: isLoading
+            ? Center(
+                child: SpinKitPouringHourGlassRefined(color: doorDashRed, size: 60),
+              )
+            : orders.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.fastfood, size: 100, color: doorDashGrey.withOpacity(0.3)),
+                        const SizedBox(height: 20),
+                        Text(
+                          'No orders yet',
+                          style: GoogleFonts.poppins(fontSize: 20, color: doorDashGrey),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Order some delicious food now!',
+                          style: GoogleFonts.poppins(fontSize: 14, color: doorDashGrey.withOpacity(0.7)),
+                        ),
+                      ],
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _fetchOrders,
+                    color: doorDashRed,
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: orders.length,
+                      itemBuilder: (context, index) {
+                        final order = orders[index];
+                        final isHighlighted = widget.orderId != null && order['id'].toString() == widget.orderId;
+                        return _buildOrderCard(order, isHighlighted);
+                      },
+                    ),
+                  ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
@@ -238,111 +235,118 @@ class _OrderScreenState extends State<OrderScreen> with SingleTickerProviderStat
           BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Owner'),
         ],
         currentIndex: _selectedIndex,
-        selectedItemColor: primaryColor,
-        unselectedItemColor: textColor.withOpacity(0.6),
-        backgroundColor: Colors.white,
-        elevation: 10,
+        selectedItemColor: doorDashRed,
+        unselectedItemColor: doorDashGrey.withOpacity(0.6),
+        backgroundColor: doorDashWhite,
+        elevation: 8,
         type: BottomNavigationBarType.fixed,
         onTap: _onItemTapped,
         selectedLabelStyle: GoogleFonts.poppins(fontWeight: FontWeight.w600),
         unselectedLabelStyle: GoogleFonts.poppins(),
-      ).animate().slideY(begin: 1.0, end: 0.0, duration: 500.ms),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: isLoading ? null : _fetchOrders,
+        backgroundColor: doorDashRed,
+        child: const Icon(Icons.refresh, color: doorDashWhite),
+        tooltip: 'Refresh Orders',
+      ),
     );
   }
 
   Widget _buildOrderCard(dynamic order, bool isHighlighted) {
-    return Animate(
-      effects: [FadeEffect(duration: const Duration(milliseconds: 600)), SlideEffect(begin: const Offset(0, 0.2), end: Offset.zero)],
-      child: GestureDetector(
-        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrackingScreen(trackingNumber: order['tracking_number'] ?? ''))),
-        child: Card(
-          elevation: isHighlighted ? 10 : 6,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          margin: const EdgeInsets.symmetric(vertical: 10),
-          color: Colors.white,
-          shadowColor: isHighlighted ? primaryColor.withOpacity(0.4) : primaryColor.withOpacity(0.2),
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.fastfood, size: 24, color: primaryColor),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Order #${order['id']}',
-                          style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: textColor),
-                        ),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(order['status']),
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [BoxShadow(color: _getStatusColor(order['status']).withOpacity(0.3), blurRadius: 6)],
-                      ),
-                      child: Text(
-                        order['status'],
-                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Total: \$${order['total'] ?? 'N/A'}', style: GoogleFonts.poppins(fontSize: 16, color: textColor)),
-                    Text(
-                      'Items: ${order['items']?.length ?? 'N/A'}',
-                      style: GoogleFonts.poppins(fontSize: 14, color: textColor.withOpacity(0.7)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Tracking: ${order['tracking_number'] ?? 'Pending'}',
-                  style: GoogleFonts.poppins(fontSize: 14, color: textColor.withOpacity(0.7)),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    if (order['status'] == 'pending')
-                      ElevatedButton.icon(
-                        onPressed: () => _cancelOrder(order['id'].toString()),
-                        icon: const Icon(Icons.cancel, size: 18),
-                        label: const Text('Cancel'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.redAccent,
-                          foregroundColor: Colors.white.withOpacity(0.3),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          elevation: 2,
-                        ),
-                      ).animate().scale(duration: 200.ms),
-                    const SizedBox(width: 12),
-                    ElevatedButton.icon(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrackingScreen(trackingNumber: order['tracking_number'] ?? ''))),
-                      icon: const Icon(Icons.track_changes, size: 18),
-                      label: const Text('Track'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: primaryColor,
-                        foregroundColor: Colors.white.withOpacity(0.3),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        elevation: 2,
-                      ),
-                    ).animate().scale(duration: 200.ms),
-                  ],
-                ),
-              ],
+    return GestureDetector(
+      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrackingScreen(trackingNumber: order['tracking_number'] ?? ''))),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: doorDashWhite,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: isHighlighted ? doorDashRed.withOpacity(0.3) : Colors.black.withOpacity(0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.fastfood, size: 24, color: doorDashRed),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Order #${order['id']}',
+                        style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor(order['status']),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Text(
+                      order['status'],
+                      style: GoogleFonts.poppins(fontSize: 12, color: doorDashWhite, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Total: \$${order['total'] ?? 'N/A'}',
+                    style: GoogleFonts.poppins(fontSize: 16, color: textColor),
+                  ),
+                  Text(
+                    'Items: ${order['items']?.length ?? 'N/A'}',
+                    style: GoogleFonts.poppins(fontSize: 14, color: doorDashGrey),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Tracking: ${order['tracking_number'] ?? 'Pending'}',
+                style: GoogleFonts.poppins(fontSize: 14, color: doorDashGrey),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (order['status'] == 'pending')
+                    TextButton(
+                      onPressed: () => _cancelOrder(order['id'].toString()),
+                      child: Text(
+                        'Cancel',
+                        style: GoogleFonts.poppins(fontSize: 14, color: Colors.redAccent, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrackingScreen(trackingNumber: order['tracking_number'] ?? ''))),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: doorDashRed,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    ),
+                    child: Text(
+                      'Track',
+                      style: GoogleFonts.poppins(fontSize: 14, color: doorDashWhite, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
@@ -352,15 +356,15 @@ class _OrderScreenState extends State<OrderScreen> with SingleTickerProviderStat
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'pending':
-        return secondaryColor;
+        return Colors.orange;
       case 'in_transit':
         return Colors.blueAccent;
       case 'delivered':
-        return accentColor;
+        return Colors.green;
       case 'cancelled':
         return Colors.redAccent;
       default:
-        return Colors.grey.shade400;
+        return doorDashGrey;
     }
   }
 }
@@ -373,25 +377,23 @@ class TrackingScreen extends StatefulWidget {
   State<TrackingScreen> createState() => _TrackingScreenState();
 }
 
-class _TrackingScreenState extends State<TrackingScreen> with SingleTickerProviderStateMixin {
+class _TrackingScreenState extends State<TrackingScreen> {
+  static const Color doorDashRed = Color(0xFFEF2A39);
+  static const Color doorDashGrey = Color(0xFF757575);
+  static const Color doorDashLightGrey = Color(0xFFF5F5F5);
+  static const Color doorDashWhite = Colors.white;
+
   Map<String, dynamic>? trackingData;
   bool isLoading = true;
-  late AnimationController _animationController;
 
   @override
   void initState() {
     super.initState();
-    _animationController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000))..forward();
     if (widget.trackingNumber.isNotEmpty) _fetchTracking();
   }
 
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
-
   Future<void> _fetchTracking() async {
+    setState(() => isLoading = true);
     try {
       final auth = Provider.of<AuthProvider>(context, listen: false);
       trackingData = await auth.getOrderTracking(widget.trackingNumber);
@@ -399,7 +401,12 @@ class _TrackingScreenState extends State<TrackingScreen> with SingleTickerProvid
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e', style: GoogleFonts.poppins()), backgroundColor: Colors.redAccent),
+          SnackBar(
+            content: Text('Error: $e', style: GoogleFonts.poppins(color: doorDashWhite)),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
         );
         setState(() => isLoading = false);
       }
@@ -409,138 +416,115 @@ class _TrackingScreenState extends State<TrackingScreen> with SingleTickerProvid
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  primaryColor.withOpacity(0.7),
-                  secondaryColor.withOpacity(0.3),
-                  const Color(0xFFF5F5F5),
-                ],
-              ),
-            ),
-            child: CustomPaint(painter: WavePainter()),
+      backgroundColor: doorDashLightGrey,
+      appBar: AppBar(
+        backgroundColor: doorDashRed,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: doorDashWhite, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Track Order #${widget.trackingNumber}',
+          style: GoogleFonts.poppins(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+            color: doorDashWhite,
           ),
-          SafeArea(
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: primaryColor,
-                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
-                    boxShadow: [BoxShadow(color: primaryColor.withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4))],
-                  ),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-                        onPressed: () => Navigator.pop(context),
-                      ),
-                      Expanded(
-                        child: Text(
-                          'Track Order #${widget.trackingNumber}',
-                          style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
-                          textAlign: TextAlign.center,
+        ),
+        centerTitle: true,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [doorDashRed, doorDashRed.withOpacity(0.9)],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+          ),
+        ),
+      ),
+      body: SafeArea(
+        child: isLoading
+            ? Center(
+                child: SpinKitPouringHourGlassRefined(color: doorDashRed, size: 60),
+              )
+            : trackingData == null
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.local_shipping, size: 100, color: doorDashGrey.withOpacity(0.3)),
+                        const SizedBox(height: 20),
+                        Text(
+                          'Tracking not available yet',
+                          style: GoogleFonts.poppins(fontSize: 20, color: doorDashGrey),
                         ),
-                      ),
-                      const SizedBox(width: 48),
-                    ],
-                  ),
-                ).animate().fadeIn(duration: 600.ms),
-                Expanded(
-                  child: isLoading
-                      ? Center(child: SpinKitPouringHourGlassRefined(color: primaryColor, size: 60))
-                      : trackingData == null
-                          ? Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
+                        const SizedBox(height: 10),
+                        Text(
+                          'Check back soon!',
+                          style: GoogleFonts.poppins(fontSize: 14, color: doorDashGrey.withOpacity(0.7)),
+                        ),
+                      ],
+                    ),
+                  )
+                : SingleChildScrollView(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionTitle('Tracking Details'),
+                        const SizedBox(height: 16),
+                        _buildTrackingTimeline(),
+                        const SizedBox(height: 24),
+                        Container(
+                          height: 250,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            color: doorDashWhite,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.05),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Icon(Icons.map, size: 80, color: doorDashGrey.withOpacity(0.3)),
+                              Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.local_shipping, size: 100, color: textColor.withOpacity(0.2)),
-                                  const SizedBox(height: 20),
                                   Text(
-                                    'Tracking not available yet',
-                                    style: GoogleFonts.poppins(fontSize: 20, color: textColor.withOpacity(0.7)),
+                                    'Map Coming Soon',
+                                    style: GoogleFonts.poppins(fontSize: 18, color: doorDashGrey),
                                   ),
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 8),
                                   Text(
-                                    'Check back soon!',
-                                    style: GoogleFonts.poppins(fontSize: 14, color: textColor.withOpacity(0.5)),
+                                    'Stay tuned for real-time tracking!',
+                                    style: GoogleFonts.poppins(fontSize: 12, color: doorDashGrey.withOpacity(0.7)),
                                   ),
                                 ],
-                              ).animate().fadeIn(duration: 800.ms),
-                            )
-                          : SingleChildScrollView(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Card(
-                                elevation: 8,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                                shadowColor: primaryColor.withOpacity(0.3),
-                                child: Padding(
-                                  padding: const EdgeInsets.all(20.0),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Icon(Icons.local_shipping, size: 28, color: primaryColor),
-                                          const SizedBox(width: 12),
-                                          Text(
-                                            'Tracking Details',
-                                            style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 20),
-                                      _buildTrackingTimeline(),
-                                      const SizedBox(height: 24),
-                                      Container(
-                                        height: 250,
-                                        width: double.infinity,
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(16),
-                                          gradient: LinearGradient(
-                                            colors: [secondaryColor.withOpacity(0.4), Colors.grey[200]!],
-                                            begin: Alignment.topLeft,
-                                            end: Alignment.bottomRight,
-                                          ),
-                                          boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.2), blurRadius: 8)],
-                                        ),
-                                        child: Stack(
-                                          alignment: Alignment.center,
-                                          children: [
-                                            Icon(Icons.map, size: 80, color: textColor.withOpacity(0.3)),
-                                            Column(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                Text(
-                                                  'Map Coming Soon',
-                                                  style: GoogleFonts.poppins(fontSize: 18, color: textColor.withOpacity(0.7)),
-                                                ),
-                                                const SizedBox(height: 8),
-                                                Text(
-                                                  'Stay tuned for real-time tracking!',
-                                                  style: GoogleFonts.poppins(fontSize: 12, color: textColor.withOpacity(0.5)),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-                                      ).animate().fadeIn(duration: 800.ms),
-                                    ],
-                                  ),
-                                ),
                               ),
-                            ),
-                ),
-              ],
-            ),
-          ),
-        ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Text(
+      title,
+      style: GoogleFonts.poppins(
+        fontSize: 20,
+        fontWeight: FontWeight.bold,
+        color: textColor,
       ),
     );
   }
@@ -562,80 +546,60 @@ class _TrackingScreenState extends State<TrackingScreen> with SingleTickerProvid
       },
     ];
 
-    return Column(
-      children: steps.asMap().entries.map((entry) {
-        final index = entry.key;
-        final step = entry.value;
-        return Animate(
-          effects: [FadeEffect(delay: Duration(milliseconds: index * 200)), SlideEffect(begin: const Offset(0, 0.2), end: Offset.zero)],
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: step['isActive'] ? primaryColor.withOpacity(0.1) : Colors.grey.withOpacity(0.1),
-                        border: Border.all(color: step['isActive'] ? primaryColor : Colors.grey, width: 2),
-                      ),
-                      child: Icon(step['icon'], color: step['isActive'] ? primaryColor : textColor.withOpacity(0.3), size: 24),
-                    ),
-                    if (index < steps.length - 1)
-                      Container(
-                        width: 2,
-                        height: 40,
-                        color: step['isActive'] ? primaryColor.withOpacity(0.5) : Colors.grey.withOpacity(0.2),
-                      ),
-                  ],
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        step['title'],
-                        style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.w600, color: textColor),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        step['subtitle'],
-                        style: GoogleFonts.poppins(fontSize: 14, color: textColor.withOpacity(0.7)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+    return Container(
+      decoration: BoxDecoration(
+        color: doorDashWhite,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
-        );
-      }).toList(),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: steps.asMap().entries.map((entry) {
+            final step = entry.value;
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12.0),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: step['isActive'] ? doorDashRed.withOpacity(0.1) : doorDashGrey.withOpacity(0.1),
+                      border: Border.all(color: step['isActive'] ? doorDashRed : doorDashGrey, width: 2),
+                    ),
+                    child: Icon(step['icon'], color: step['isActive'] ? doorDashRed : doorDashGrey, size: 24),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          step['title'],
+                          style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: textColor),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          step['subtitle'],
+                          style: GoogleFonts.poppins(fontSize: 14, color: doorDashGrey),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ),
     );
   }
-}
-
-class WavePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = accentColor.withOpacity(0.15)
-      ..style = PaintingStyle.fill;
-
-    final path = Path();
-    path.moveTo(0, size.height * 0.75);
-    path.quadraticBezierTo(size.width * 0.25, size.height * 0.65, size.width * 0.5, size.height * 0.75);
-    path.quadraticBezierTo(size.width * 0.75, size.height * 0.85, size.width, size.height * 0.75);
-    path.lineTo(size.width, size.height);
-    path.lineTo(0, size.height);
-    path.close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
