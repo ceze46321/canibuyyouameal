@@ -3,6 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:geocoding/geocoding.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:html' as html if (dart.library.html) 'dart:html';
 
 class ApiService {
   static const String baseUrl = 'https://plus.apexjets.org/api';
@@ -10,6 +11,7 @@ class ApiService {
   static const String googlePlacesUrl = 'https://maps.googleapis.com/maps/api/place';
   static String get googleApiKey => dotenv.env['GOOGLE_API_KEY'] ?? 'YOUR_GOOGLE_API_KEY';
   String? _token;
+  static const bool _isWeb = identical(0, 0.0);
 
   // Singleton pattern
   static final ApiService _instance = ApiService._internal();
@@ -26,24 +28,36 @@ class ApiService {
         if (_token != null) 'Authorization': 'Bearer $_token',
       };
 
-  // Load token from persistent storage
+  // Load token from persistent storage (Updated for web support)
   Future<void> loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('auth_token');
+    if (_isWeb) {
+      _token = html.window.localStorage['auth_token'];
+    } else {
+      final prefs = await SharedPreferences.getInstance();
+      _token = prefs.getString('auth_token');
+    }
   }
 
-  // Set token and persist it
+  // Set token and persist it (Updated for web support)
   Future<void> setToken(String token) async {
     _token = token;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('auth_token', token);
+    if (_isWeb) {
+      html.window.localStorage['auth_token'] = token;
+    } else {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('auth_token', token);
+    }
   }
 
-  // Clear token
+  // Clear token (Updated for web support)
   Future<void> clearToken() async {
     _token = null;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auth_token');
+    if (_isWeb) {
+      html.window.localStorage.remove('auth_token');
+    } else {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('auth_token');
+    }
   }
 
   // Generic HTTP Methods
@@ -120,12 +134,16 @@ class ApiService {
     String email, {
     String? deliveryLocation,
     String? role,
+    String? phone,
+    String? vehicle,
   }) async {
     final body = {
       'name': name,
       'email': email,
       if (deliveryLocation != null) 'delivery_location': deliveryLocation,
       if (role != null) 'role': role,
+      if (phone != null) 'phone': phone,
+      if (vehicle != null) 'vehicle': vehicle,
     };
     return await put('/profile', body);
   }
@@ -277,5 +295,17 @@ class ApiService {
   Future<List<dynamic>> fetchUserGroceries() async {
     final data = await get('/user/groceries');
     return data is List ? data : data['groceries'] ?? data['data'] ?? [];
+  }
+
+  // New API Endpoints (Add here)
+  // Example: Get Dasher-specific orders
+  Future<List<dynamic>> getDasherOrders() async {
+    final data = await get('/dasher/orders');
+    return data is List ? data : data['orders'] ?? [];
+  }
+
+  // Example: Accept an order as a Dasher
+  Future<Map<String, dynamic>> acceptOrder(String orderId) async {
+    return await post('/dasher/orders/$orderId/accept', {});
   }
 }

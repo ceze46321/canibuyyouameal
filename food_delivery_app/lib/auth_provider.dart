@@ -12,6 +12,8 @@ class AuthProvider with ChangeNotifier {
   String? _email;
   String? _role;
   String? _deliveryLocation;
+  String? _phone;
+  String? _vehicle;
   List<CartItem> _cartItems = [];
   List<Map<String, dynamic>> _groceryProducts = [];
   List<Map<String, dynamic>> _userGroceries = [];
@@ -24,6 +26,8 @@ class AuthProvider with ChangeNotifier {
   String? get email => _email;
   String? get role => _role;
   String? get deliveryLocation => _deliveryLocation;
+  String? get phone => _phone;
+  String? get vehicle => _vehicle;
   bool get isLoggedIn => _token != null;
   List<CartItem> get cartItems => _cartItems;
   double get cartTotal => _cartItems.fold(0, (sum, item) => sum + (item.price * item.quantity));
@@ -41,14 +45,26 @@ class AuthProvider with ChangeNotifier {
     debugPrint('Loading token...');
     if (_isWeb) {
       _token = html.window.localStorage['auth_token'];
+      _name = html.window.localStorage['name'];
+      _email = html.window.localStorage['email'];
+      _role = html.window.localStorage['role'];
+      _deliveryLocation = html.window.localStorage['delivery_location']; // Load deliveryLocation
+      _phone = html.window.localStorage['phone'];
+      _vehicle = html.window.localStorage['vehicle'];
     } else {
       final prefs = await SharedPreferences.getInstance();
       _token = prefs.getString('auth_token');
+      _name = prefs.getString('name');
+      _email = prefs.getString('email');
+      _role = prefs.getString('role');
+      _deliveryLocation = prefs.getString('delivery_location'); // Load deliveryLocation
+      _phone = prefs.getString('phone');
+      _vehicle = prefs.getString('vehicle');
     }
     debugPrint('Token loaded: $_token');
     if (_token != null) {
       await _apiService.setToken(_token!);
-      _fetchUserData();
+      await _fetchUserData();
     }
     notifyListeners();
   }
@@ -138,18 +154,20 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Authentication Methods (unchanged)
+  // Authentication Methods
   Future<Map<String, dynamic>> register(String name, String email, String password, String role) async {
     try {
       final response = await _apiService.register(name, email, password, role);
       _token = response['token'];
-      await _persistToken(_token!);
+      await _persistToken(_token!, name: name, email: email, role: role);
       await _apiService.setToken(_token!);
       _name = response['user']['name'] ?? name;
       _email = response['user']['email'] ?? email;
       _role = response['user']['role'] ?? role;
       _deliveryLocation = response['user']['delivery_location'];
-      _fetchUserData();
+      _phone = response['user']['phone'];
+      _vehicle = response['user']['vehicle'];
+      await _fetchUserData();
       notifyListeners();
       return response;
     } catch (e) {
@@ -162,13 +180,15 @@ class AuthProvider with ChangeNotifier {
     try {
       final response = await _apiService.login(email, password);
       _token = response['token'];
-      await _persistToken(_token!);
+      await _persistToken(_token!, name: response['user']['name'], email: email, role: response['user']['role']);
       await _apiService.setToken(_token!);
       _name = response['user']['name'];
       _email = response['user']['email'];
       _role = response['user']['role'];
       _deliveryLocation = response['user']['delivery_location'];
-      _fetchUserData();
+      _phone = response['user']['phone'];
+      _vehicle = response['user']['vehicle'];
+      await _fetchUserData();
       notifyListeners();
       return response;
     } catch (e) {
@@ -181,13 +201,15 @@ class AuthProvider with ChangeNotifier {
     try {
       final response = await _apiService.loginWithGoogle(email, accessToken);
       _token = response['token'];
-      await _persistToken(_token!);
+      await _persistToken(_token!, name: response['user']['name'], email: email, role: response['user']['role']);
       await _apiService.setToken(_token!);
       _name = response['user']['name'];
       _email = response['user']['email'];
       _role = response['user']['role'];
       _deliveryLocation = response['user']['delivery_location'];
-      _fetchUserData();
+      _phone = response['user']['phone'];
+      _vehicle = response['user']['vehicle'];
+      await _fetchUserData();
       notifyListeners();
       return response;
     } catch (e) {
@@ -204,14 +226,28 @@ class AuthProvider with ChangeNotifier {
       _email = null;
       _role = null;
       _deliveryLocation = null;
+      _phone = null;
+      _vehicle = null;
       _cartItems.clear();
       _groceryProducts.clear();
       _userGroceries.clear();
       if (_isWeb) {
         html.window.localStorage.remove('auth_token');
+        html.window.localStorage.remove('name');
+        html.window.localStorage.remove('email');
+        html.window.localStorage.remove('role');
+        html.window.localStorage.remove('delivery_location'); // Clear deliveryLocation
+        html.window.localStorage.remove('phone');
+        html.window.localStorage.remove('vehicle');
       } else {
         final prefs = await SharedPreferences.getInstance();
         await prefs.remove('auth_token');
+        await prefs.remove('name');
+        await prefs.remove('email');
+        await prefs.remove('role');
+        await prefs.remove('delivery_location'); // Clear deliveryLocation
+        await prefs.remove('phone');
+        await prefs.remove('vehicle');
       }
       notifyListeners();
     } catch (e) {
@@ -227,6 +263,9 @@ class AuthProvider with ChangeNotifier {
       _email = response['email'];
       _role = response['role'];
       _deliveryLocation = response['delivery_location'];
+      _phone = response['phone'];
+      _vehicle = response['vehicle'];
+      await _persistToken(_token!, name: _name, email: _email, role: _role, deliveryLocation: _deliveryLocation, phone: _phone, vehicle: _vehicle);
       notifyListeners();
       return response;
     } catch (e) {
@@ -235,21 +274,48 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<void> updateProfile(String name, String email, {String? deliveryLocation, String? role}) async {
+  Future<void> updateProfile(String name, String email, {String? deliveryLocation, String? role, String? phone, String? vehicle}) async {
     try {
       final response = await _apiService.updateProfile(
         name,
         email,
         deliveryLocation: deliveryLocation,
-        role: role, // Pass role to API
+        role: role,
+        phone: phone,
+        vehicle: vehicle,
       );
       _name = response['user']['name'];
       _email = response['user']['email'];
       _role = response['user']['role'];
       _deliveryLocation = response['user']['delivery_location'];
+      _phone = response['user']['phone'];
+      _vehicle = response['user']['vehicle'];
+      await _persistToken(_token!, name: _name, email: _email, role: _role, deliveryLocation: _deliveryLocation, phone: _phone, vehicle: _vehicle);
       notifyListeners();
     } catch (e) {
       debugPrint('Update profile failed: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateDasherDetails({required String name, required String phone, required String vehicle}) async {
+    try {
+      final response = await _apiService.updateProfile(
+        name,
+        _email ?? '',
+        phone: phone,
+        vehicle: vehicle,
+        role: 'dasher',
+      );
+      _name = response['user']['name'];
+      _phone = response['user']['phone'];
+      _vehicle = response['user']['vehicle'];
+      _role = response['user']['role'];
+      _deliveryLocation = response['user']['delivery_location']; // Ensure deliveryLocation is updated
+      await _persistToken(_token!, name: _name, email: _email, role: _role, deliveryLocation: _deliveryLocation, phone: _phone, vehicle: _vehicle);
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Update Dasher details failed: $e');
       rethrow;
     }
   }
@@ -258,6 +324,7 @@ class AuthProvider with ChangeNotifier {
     try {
       final response = await _apiService.upgradeRole(newRole);
       _role = newRole;
+      await _persistToken(_token!, name: _name, email: _email, role: _role, deliveryLocation: _deliveryLocation, phone: _phone, vehicle: _vehicle);
       notifyListeners();
       return response;
     } catch (e) {
@@ -488,13 +555,31 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Helper method to persist token
-  Future<void> _persistToken(String token) async {
+  // Updated helper method to persist token and all fields
+  Future<void> _persistToken(String token, {String? name, String? email, String? role, String? deliveryLocation, String? phone, String? vehicle}) async {
     if (_isWeb) {
       html.window.localStorage['auth_token'] = token;
+      if (name != null) html.window.localStorage['name'] = name;
+      if (email != null) html.window.localStorage['email'] = email;
+      if (role != null) html.window.localStorage['role'] = role;
+      if (deliveryLocation != null) html.window.localStorage['delivery_location'] = deliveryLocation;
+      if (phone != null) html.window.localStorage['phone'] = phone;
+      if (vehicle != null) html.window.localStorage['vehicle'] = vehicle;
     } else {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', token);
+      if (name != null) await prefs.setString('name', name);
+      if (email != null) await prefs.setString('email', email);
+      if (role != null) await prefs.setString('role', role);
+      if (deliveryLocation != null) await prefs.setString('delivery_location', deliveryLocation);
+      if (phone != null) await prefs.setString('phone', phone);
+      if (vehicle != null) await prefs.setString('vehicle', vehicle);
     }
+  }
+
+  // Optional: Explicit refresh method
+  Future<void> refreshProfile() async {
+    if (!isLoggedIn) return;
+    await _fetchUserData();
   }
 }

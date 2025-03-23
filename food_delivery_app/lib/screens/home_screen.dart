@@ -5,8 +5,8 @@ import '../auth_provider.dart';
 import '../main.dart' show textColor, accentColor;
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'add_grocery_screen.dart'; // Import for AddGroceryScreen
-import 'create_grocery_product_screen.dart'; // Import for CreateGroceryProductScreen
+import 'add_grocery_screen.dart';
+import 'create_grocery_product_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -51,21 +51,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
   void _onItemTapped(int index) {
     setState(() => _selectedIndex = index);
-    switch (index) {
-      case 0:
-        break;
-      case 1:
-        Navigator.pushReplacementNamed(context, '/restaurants');
-        break;
-      case 2:
-        Navigator.pushReplacementNamed(context, '/orders');
-        break;
-      case 3:
-        Navigator.pushReplacementNamed(context, '/profile');
-        break;
-      case 4:
-        Navigator.pushReplacementNamed(context, '/restaurant-owner');
-        break;
+    final routes = {
+      0: '/home',
+      1: '/restaurants',
+      2: '/orders',
+      3: '/profile',
+      4: '/restaurant-owner',
+      5: '/dashers', // New Dasher tab
+    };
+    if (index != 0 && routes.containsKey(index)) { // 0 is Home, stay if tapped
+      Navigator.pushReplacementNamed(context, routes[index]!);
     }
   }
 
@@ -144,19 +139,18 @@ Full policy at chiwexpress.com/privacy.
     final auth = Provider.of<AuthProvider>(context);
     final userName = auth.name ?? 'Foodie';
     final userRole = auth.role ?? 'Visitor';
-    print('HomeScreen - Role: ${auth.role}, IsRestaurantOwner: ${auth.isRestaurantOwner}'); // Debug role
+    print('HomeScreen - Role: ${auth.role}, IsRestaurantOwner: ${auth.isRestaurantOwner}');
 
     return Scaffold(
       body: Stack(
         children: [
-          // DoorDash-inspired background
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  const Color(0xFFEF2A39), // DoorDash Red
+                  const Color(0xFFEF2A39),
                   const Color(0xFFD81B23).withOpacity(0.9),
                   Colors.white.withOpacity(0.95),
                 ],
@@ -244,11 +238,9 @@ Full policy at chiwexpress.com/privacy.
                               const SizedBox(height: 8),
                               Text(
                                 'Role: $userRole',
-                                style: GoogleFonts.poppins(fontSize: 14, color: const Color(0xFFEF2A39)),
+                                style: GoogleFonts.poppins(fontSize: 14, color: Colors.white), // Changed to white
                               ),
                               const SizedBox(height: 30),
-
-                              // Why Chiw Express Section
                               Text(
                                 'Why Can I Buy You A Meal?',
                                 style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
@@ -266,8 +258,6 @@ Full policy at chiwexpress.com/privacy.
                                 ],
                               ),
                               const SizedBox(height: 30),
-
-                              // Featured Restaurants Section
                               Text(
                                 'Featured Restaurants',
                                 style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
@@ -291,8 +281,6 @@ Full policy at chiwexpress.com/privacy.
                                           ),
                               ),
                               const SizedBox(height: 30),
-
-                              // Top Dishes Section
                               Text(
                                 'Top Dishes',
                                 style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
@@ -310,8 +298,6 @@ Full policy at chiwexpress.com/privacy.
                                 ),
                               ),
                               const SizedBox(height: 30),
-
-                              // Testimonials Section
                               Text(
                                 'What Our Users Say',
                                 style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
@@ -319,8 +305,6 @@ Full policy at chiwexpress.com/privacy.
                               const SizedBox(height: 16),
                               _buildTestimonialCarousel(),
                               const SizedBox(height: 30),
-
-                              // Quick Actions Section
                               Text(
                                 'Quick Actions',
                                 style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: textColor),
@@ -380,7 +364,6 @@ Full policy at chiwexpress.com/privacy.
                   ],
                 ),
               ),
-              // Bottom Navigation with Terms and Privacy
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 24.0),
                 color: Colors.white.withOpacity(0.9),
@@ -424,6 +407,7 @@ Full policy at chiwexpress.com/privacy.
           BottomNavigationBarItem(icon: Icon(Icons.shopping_cart), label: 'Orders'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
           BottomNavigationBarItem(icon: Icon(Icons.store), label: 'Owner'),
+          BottomNavigationBarItem(icon: Icon(Icons.directions_bike), label: 'Dasher'), // New Dasher tab
         ],
         currentIndex: _selectedIndex,
         selectedItemColor: const Color(0xFFEF2A39),
@@ -623,7 +607,6 @@ Full policy at chiwexpress.com/privacy.
   }
 }
 
-// Subtle texture painter
 class SubtleTexturePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {

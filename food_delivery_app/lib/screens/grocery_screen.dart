@@ -66,11 +66,20 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
 
   void _initDeepLinkListener() async {
     final initialLink = await getInitialLink();
-    if (initialLink != null) _handleDeepLink(initialLink);
+    if (initialLink != null) {
+      debugPrint('Initial deep link: $initialLink');
+      _handleDeepLink(initialLink);
+    }
 
     _sub = linkStream.listen((String? link) {
-      if (link != null) _handleDeepLink(link);
+      if (link != null) {
+        debugPrint('Received deep link: $link');
+        _handleDeepLink(link);
+      } else {
+        debugPrint('Received null deep link');
+      }
     }, onError: (err) {
+      debugPrint('Deep link error: $err');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Deep link error: $err'), backgroundColor: Colors.redAccent),
       );
@@ -81,18 +90,25 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
     final uri = Uri.parse(link);
     final status = uri.queryParameters['status'];
     final message = uri.queryParameters['message'];
-    if (status == 'completed') {
-      setState(() => cart.clear());
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment successful!'), backgroundColor: doorDashRed),
-      );
+
+    debugPrint('Handling deep link - Status: $status, Message: $message');
+
+    if (status != null) {
+      if (status == 'completed') {
+        setState(() => cart.clear());
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Payment successful!'), backgroundColor: doorDashRed),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Payment $status${message != null ? ': $message' : ''}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Payment $status${message != null ? ': $message' : ''}'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      debugPrint('No payment status in deep link, skipping SnackBar');
     }
   }
 
@@ -102,7 +118,7 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
       return items.map((item) => {
             'id': grocery['id']?.toString() ?? 'unknown',
             'name': item['name']?.toString() ?? 'Unnamed',
-            'quantity': item['quantity'] ?? 1,
+            'stock_quantity': item['quantity'] ?? 1,
             'price': (item['price'] as num?)?.toDouble() ?? 0.0,
             'image': item['image']?.toString(),
           });
@@ -116,17 +132,40 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
 
   void _addToCart(Map<String, dynamic> item) {
     setState(() {
-      cart.add({
-        'id': item['id'],
-        'name': item['name'],
-        'quantity': item['quantity'],
-        'price': item['price'],
-        'image': item['image'],
-      });
+      final existingItemIndex = cart.indexWhere((cartItem) => cartItem['id'] == item['id']);
+      if (existingItemIndex != -1) {
+        cart[existingItemIndex]['ordered_quantity'] = (cart[existingItemIndex]['ordered_quantity'] ?? 0) + 1;
+      } else {
+        cart.add({
+          'id': item['id'],
+          'name': item['name'],
+          'stock_quantity': item['stock_quantity'],
+          'ordered_quantity': 1,
+          'price': item['price'],
+          'image': item['image'],
+        });
+      }
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('${item['name']} added to cart!'), backgroundColor: doorDashRed),
     );
+  }
+
+  void _removeFromCart(Map<String, dynamic> item) {
+    setState(() {
+      final existingItemIndex = cart.indexWhere((cartItem) => cartItem['id'] == item['id']);
+      if (existingItemIndex != -1) {
+        final currentQuantity = cart[existingItemIndex]['ordered_quantity'] as int;
+        if (currentQuantity > 1) {
+          cart[existingItemIndex]['ordered_quantity'] = currentQuantity - 1;
+        } else {
+          cart.removeAt(existingItemIndex);
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${item['name']} removed from cart!'), backgroundColor: doorDashRed),
+        );
+      }
+    });
   }
 
   Future<void> _checkout() async {
@@ -195,7 +234,8 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
     try {
       final groceryItems = cart.map((item) => ({
             'name': item['name'],
-            'quantity': item['quantity'],
+            'quantity': item['stock_quantity'],
+            'ordered_quantity': item['ordered_quantity'],
             'price': item['price'],
             'image': item['image'],
           })).toList();
@@ -402,30 +442,54 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
                 Container(
                   padding: const EdgeInsets.all(16),
                   color: Colors.white,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      Text(
+                        'Your Cart',
+                        style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: textColor),
+                      ),
+                      const SizedBox(height: 8),
+                      ...cart.map((item) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4.0),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    '${item['name']} x ${item['ordered_quantity']}',
+                                    style: GoogleFonts.poppins(fontSize: 14, color: textColor),
+                                  ),
+                                ),
+                                Text(
+                                  '₦${(item['ordered_quantity'] * item['price']).toStringAsFixed(2)}',
+                                  style: GoogleFonts.poppins(fontSize: 14, color: doorDashGrey),
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.remove_circle, color: doorDashRed),
+                                  onPressed: () => _removeFromCart(item),
+                                ),
+                              ],
+                            ),
+                          )),
+                      const Divider(),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Cart: ${cart.length} item${cart.length > 1 ? 's' : ''}',
+                            'Total: ₦${cart.fold(0.0, (sum, item) => sum + (item['ordered_quantity'] * item['price'])).toStringAsFixed(2)}',
                             style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold, color: textColor),
                           ),
-                          Text(
-                            '₦${cart.fold(0.0, (sum, item) => sum + (item['quantity'] * item['price'])).toStringAsFixed(2)}',
-                            style: GoogleFonts.poppins(fontSize: 14, color: doorDashGrey),
+                          ElevatedButton(
+                            onPressed: _checkout,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: doorDashRed,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            ),
+                            child: Text('Checkout', style: GoogleFonts.poppins(color: Colors.white, fontSize: 16)),
                           ),
                         ],
-                      ),
-                      ElevatedButton(
-                        onPressed: _checkout,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: doorDashRed,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        ),
-                        child: Text('Checkout', style: GoogleFonts.poppins(color: Colors.white, fontSize: 16)),
                       ),
                     ],
                   ),
@@ -443,7 +507,7 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
                       ),
                     ),
                     TextButton(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AddGroceryScreen())),
+                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const CreateGroceryProductScreen())),
                       child: Text(
                         'Add New Order',
                         style: GoogleFonts.poppins(color: doorDashRed, fontWeight: FontWeight.w600),
@@ -523,7 +587,7 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '₦${(product['price'] as num?)?.toStringAsFixed(2) ?? 'N/A'} • Qty: ${product['quantity']?.toString() ?? 'N/A'}',
+                  '₦${(product['price'] as num?)?.toStringAsFixed(2) ?? 'N/A'} • Stock: ${product['stock_quantity']?.toString() ?? 'N/A'}',
                   style: GoogleFonts.poppins(color: doorDashGrey, fontSize: 14),
                 ),
                 const SizedBox(height: 8),

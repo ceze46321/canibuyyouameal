@@ -305,7 +305,7 @@ class _OrderScreenState extends State<OrderScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Total: \$${order['total'] ?? 'N/A'}',
+                    'Total: \N${order['total'] ?? 'N/A'}',
                     style: GoogleFonts.poppins(fontSize: 16, color: textColor),
                   ),
                   Text(

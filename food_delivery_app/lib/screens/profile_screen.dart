@@ -17,6 +17,9 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
+  final _phoneController = TextEditingController(); // Added phone controller
+  final _vehicleController = TextEditingController(); // Added vehicle controller
+  final _deliveryLocationController = TextEditingController(); // Added delivery location controller
   String? _selectedRole;
   bool _isLoading = false;
   int _selectedIndex = 4;
@@ -35,6 +38,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     final auth = Provider.of<AuthProvider>(context, listen: false);
     _nameController.text = auth.name ?? '';
     _emailController.text = auth.email ?? '';
+    _phoneController.text = auth.phone ?? ''; // Initialize phone
+    _vehicleController.text = auth.vehicle ?? ''; // Initialize vehicle
+    _deliveryLocationController.text = auth.deliveryLocation ?? ''; // Initialize delivery location
     _selectedRole = auth.role ?? 'customer';
     _animationController = AnimationController(
       vsync: this,
@@ -49,6 +55,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
+    _phoneController.dispose(); // Dispose phone controller
+    _vehicleController.dispose(); // Dispose vehicle controller
+    _deliveryLocationController.dispose(); // Dispose delivery location controller
     _animationController.dispose();
     super.dispose();
   }
@@ -61,6 +70,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       if (mounted) {
         _nameController.text = authProvider.name ?? '';
         _emailController.text = authProvider.email ?? '';
+        _phoneController.text = authProvider.phone ?? ''; // Update phone
+        _vehicleController.text = authProvider.vehicle ?? ''; // Update vehicle
+        _deliveryLocationController.text = authProvider.deliveryLocation ?? ''; // Update delivery location
         _selectedRole = authProvider.role ?? 'customer';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -90,7 +102,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     setState(() => _isLoading = true);
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.updateProfile(_nameController.text, _emailController.text, role: _selectedRole);
+      await authProvider.updateProfile(
+        _nameController.text,
+        _emailController.text,
+        role: _selectedRole,
+        phone: _phoneController.text, // Pass phone
+        vehicle: _vehicleController.text, // Pass vehicle
+        deliveryLocation: _deliveryLocationController.text, // Pass delivery location
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Profile updated!', style: GoogleFonts.poppins(color: Colors.white)), backgroundColor: doorDashRed),
@@ -243,6 +262,24 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                               controller: _emailController,
                               label: 'Email',
                               icon: Icons.email,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildTextField(
+                              controller: _phoneController,
+                              label: 'Phone',
+                              icon: Icons.phone,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildTextField(
+                              controller: _vehicleController,
+                              label: 'Vehicle',
+                              icon: Icons.directions_car,
+                            ),
+                            const SizedBox(height: 12),
+                            _buildTextField(
+                              controller: _deliveryLocationController,
+                              label: 'Delivery Location',
+                              icon: Icons.location_on,
                             ),
                             const SizedBox(height: 12),
                             DropdownButtonFormField<String>(
