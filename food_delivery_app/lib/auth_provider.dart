@@ -66,7 +66,7 @@ class AuthProvider with ChangeNotifier {
       _phone = prefs.getString('phone');
       _vehicle = prefs.getString('vehicle');
     }
-    debugPrint('Token loaded: $_token');
+    debugPrint('Token loaded: $_token, Role: $_role');
     if (_token != null) {
       await _apiService.setToken(_token!);
       await _fetchUserData();
@@ -101,6 +101,19 @@ class AuthProvider with ChangeNotifier {
       debugPrint('Error fetching customer reviews: $e');
     }
     notifyListeners();
+  }
+
+  // New Method: Fetch Restaurant Owner Data
+  Future<Map<String, dynamic>> getRestaurantOwnerData() async {
+    if (!isLoggedIn) throw Exception('User not authenticated');
+    try {
+      final response = await _apiService.getRestaurantOwnerData();
+      debugPrint('Restaurant owner data fetched: ${response['restaurants']}');
+      return response;
+    } catch (e) {
+      debugPrint('Get restaurant owner data failed: $e');
+      rethrow;
+    }
   }
 
   // Cart Management Methods (unchanged)
@@ -428,8 +441,6 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-
-  // Restaurant and Order Management (unchanged)
   Future<Map<String, dynamic>> addRestaurant(
     String name,
     String address,
@@ -460,7 +471,6 @@ class AuthProvider with ChangeNotifier {
       rethrow;
     }
   }
-
   Future<List<dynamic>> getRestaurants() async {
     try {
       return await _apiService.getRestaurantsFromApi();
@@ -567,7 +577,7 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Fetch Customer Reviews
+  // Fetch Customer Reviews (unchanged)
   Future<void> fetchCustomerReviews() async {
     if (!isLoggedIn) return;
     _isLoadingReviews = true;
@@ -585,14 +595,14 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // New Method: Submit Customer Review
+  // Submit Customer Review (unchanged)
   Future<void> submitReview(int rating, String? comment, {int? orderId}) async {
     if (!isLoggedIn) throw Exception('User not authenticated');
     try {
       final reviewData = {
         'rating': rating,
         'comment': comment,
-        if (orderId != null) 'order_id': orderId, // Optional: Tie review to an order
+        if (orderId != null) 'order_id': orderId,
       };
       final response = await _apiService.submitCustomerReview(reviewData);
       final newReview = CustomerReview.fromJson(response);

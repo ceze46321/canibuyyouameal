@@ -36,6 +36,7 @@ class ApiService {
       final prefs = await SharedPreferences.getInstance();
       _token = prefs.getString('auth_token');
     }
+    print('Token loaded: $_token');
   }
 
   // Set token and persist it
@@ -47,6 +48,7 @@ class ApiService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', token);
     }
+    print('Token set: $_token');
   }
 
   // Clear token
@@ -58,6 +60,7 @@ class ApiService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('auth_token');
     }
+    print('Token cleared');
   }
 
   // Generic HTTP Methods
@@ -97,6 +100,7 @@ class ApiService {
 
   // Handle HTTP response
   Future<dynamic> _handleResponse(http.Response response, {String action = 'API request'}) async {
+    print('Response for $action: ${response.statusCode} - ${response.body}');
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return response.body.isNotEmpty ? json.decode(response.body) : null;
     }
@@ -233,6 +237,12 @@ class ApiService {
     return data is List ? data : data['restaurants'] ?? data['data'] ?? [];
   }
 
+  // Restaurant Owner Data Method
+  Future<Map<String, dynamic>> getRestaurantOwnerData() async {
+    final data = await get('/restaurant-owner/data');
+    return data is Map<String, dynamic> ? data : {'restaurants': data ?? []};
+  }
+
   // Order Management
   Future<List<dynamic>> getOrders() async {
     final data = await get('/orders');
@@ -307,6 +317,17 @@ class ApiService {
     return await post('/dasher/orders/$orderId/accept', {});
   }
 
+  Future<void> deleteRestaurant(String restaurantId) async {
+    await delete('/restaurants/$restaurantId');
+  }
+
+  Future<Map<String, dynamic>> updateRestaurant(String restaurantId, Map<String, dynamic> data) async {
+    return await put('/restaurants/$restaurantId', data);
+  }
+
+  Future<void> deleteMenuItem(String restaurantId, String menuItemId) async {
+    await delete('/restaurants/$restaurantId/menu-items/$menuItemId');
+  }
   // Review Methods
   Future<List<dynamic>> fetchCustomerReviews() async {
     final data = await get('/customer-reviews');
