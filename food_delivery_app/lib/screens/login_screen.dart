@@ -265,15 +265,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  const Color(0xFFEF2A39), // DoorDash Red (#FF3008 equivalent)
-                  const Color(0xFFD81B23).withOpacity(0.9), // Slightly darker red
-                  Colors.white.withOpacity(0.95), // Clean white base
+                  const Color(0xFFEF2A39),
+                  const Color(0xFFD81B23).withOpacity(0.9),
+                  Colors.white.withOpacity(0.95),
                 ],
                 stops: const [0.0, 0.5, 1.0],
               ),
             ),
           ),
-          // Subtle texture (inspired by DoorDash’s clean design)
           Positioned.fill(
             child: CustomPaint(
               painter: SubtleTexturePainter(),
@@ -288,11 +287,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        // Header with full-width logo
                         Container(
                           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
                           decoration: BoxDecoration(
-                            color: Colors.transparent, // Transparent to show background
+                            color: Colors.transparent,
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Animate(
@@ -303,8 +301,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                   borderRadius: BorderRadius.circular(16),
                                   child: Image.network(
                                     'https://i.imgur.com/Qse69mz.png',
-                                    width: double.infinity, // Full width
-                                    height: 200, // Fixed height for balance
+                                    width: double.infinity,
+                                    height: 200,
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) => Container(
                                       width: double.infinity,
@@ -367,7 +365,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           ),
                         ),
                         const SizedBox(height: 40),
-                        // Login Form
                         FadeTransition(
                           opacity: _fadeAnimation,
                           child: Container(
@@ -513,6 +510,20 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                       elevation: 4,
                                     ),
                                   ).animate().slideY(begin: 0.2, end: 0.0, duration: 400.ms),
+                                  const SizedBox(height: 20), // Added space before admin login button
+                                  Center(
+                                    child: TextButton(
+                                      onPressed: () => Navigator.pushNamed(context, '/admin-login'), // Admin login route
+                                      child: Text(
+                                        'Admin Login',
+                                        style: GoogleFonts.poppins(
+                                          color: const Color(0xFFEF2A39),
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -523,10 +534,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                   ),
                 ),
               ),
-              // Bottom Navigation with Terms and Privacy
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 24.0),
-                color: Colors.white.withOpacity(0.9), // Semi-transparent white for contrast
+                color: Colors.white.withOpacity(0.9),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [

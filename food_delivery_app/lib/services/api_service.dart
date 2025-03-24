@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:geocoding/geocoding.dart';
-import 'package:flutter/foundation.dart'; // Add this for debugPrint
+import 'package:flutter/foundation.dart'; // For debugPrint
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:html' as html if (dart.library.html) 'dart:html';
 
@@ -37,7 +37,7 @@ class ApiService {
       final prefs = await SharedPreferences.getInstance();
       _token = prefs.getString('auth_token');
     }
-    print('Token loaded: $_token');
+    if (kDebugMode) print('Token loaded: $_token');
   }
 
   // Set token and persist it
@@ -49,7 +49,7 @@ class ApiService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', token);
     }
-    print('Token set: $_token');
+    if (kDebugMode) print('Token set: $_token');
   }
 
   // Clear token
@@ -61,12 +61,12 @@ class ApiService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('auth_token');
     }
-    print('Token cleared');
+    if (kDebugMode) print('Token cleared');
   }
 
   // Generic HTTP Methods
   Future<dynamic> get(String path) async {
-    if (_token == null && !path.startsWith('/login') && !path.startsWith('/register')) {
+    if (_token == null && !path.startsWith('/login') && !path.startsWith('/register') && !path.startsWith('/admin/login')) {
       throw Exception('No token set. Please log in.');
     }
     final url = '$baseUrl$path';
@@ -75,7 +75,7 @@ class ApiService {
   }
 
   Future<dynamic> post(String path, dynamic data) async {
-    if (_token == null && !path.startsWith('/login') && !path.startsWith('/register')) {
+    if (_token == null && !path.startsWith('/login') && !path.startsWith('/register') && !path.startsWith('/admin/login')) {
       throw Exception('No token set. Please log in.');
     }
     final url = '$baseUrl$path';
@@ -101,14 +101,14 @@ class ApiService {
 
   // Handle HTTP response
   Future<dynamic> _handleResponse(http.Response response, {String action = 'API request'}) async {
-    print('Response for $action: ${response.statusCode} - ${response.body}');
+    if (kDebugMode) print('Response for $action: ${response.statusCode} - ${response.body}');
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return response.body.isNotEmpty ? json.decode(response.body) : null;
     }
     throw Exception('$action failed: ${response.statusCode} - ${response.body}');
   }
 
-  // Authentication Methods
+  // Authentication Methods (unchanged)
   Future<Map<String, dynamic>> register(String name, String email, String password, String role) async {
     return await post('/register', {'name': name, 'email': email, 'password': password, 'role': role});
   }
@@ -117,16 +117,21 @@ class ApiService {
     return await post('/login', {'email': email, 'password': password});
   }
 
+  Future<Map<String, dynamic>> adminLogin(String email, String password) async {
+    return await post('/admin/login', {'email': email, 'password': password});
+  }
+
   Future<Map<String, dynamic>> loginWithGoogle(String email, String accessToken) async {
     return await post('/google-login', {'email': email, 'google_token': accessToken});
   }
 
-  Future<void> logout() async {
+  Future<void> logout({bool isAdmin = false}) async {
     if (_token == null) {
       await clearToken();
       return;
     }
-    await post('/logout', {});
+    final path = isAdmin ? '/admin/logout' : '/logout';
+    await post(path, {});
     await clearToken();
   }
 
@@ -141,6 +146,7 @@ class ApiService {
     String? role,
     String? phone,
     String? vehicle,
+    bool? admin,
   }) async {
     final body = {
       'name': name,
@@ -149,6 +155,7 @@ class ApiService {
       if (role != null) 'role': role,
       if (phone != null) 'phone': phone,
       if (vehicle != null) 'vehicle': vehicle,
+      if (admin != null) 'admin': admin,
     };
     return await put('/profile', body);
   }
@@ -157,6 +164,53 @@ class ApiService {
     return await post('/upgrade-role', {'role': newRole});
   }
 
+  // Updated Admin Methods (aligned with Laravel routes)
+  Future<List<dynamic>> getAllUsers() async {
+    final data = await get('/admin/users');
+    return data['users'] ?? data ?? []; // Fallback to raw data if 'users' key is missing
+  }
+
+  Future<List<dynamic>> getDashers() async {
+    final data = await get('/admin/dashers');
+    return data['dashers'] ?? data ?? [];
+  }
+
+  Future<List<dynamic>> getRestaurantOwners() async {
+    final data = await get('/admin/restaurant-owners');
+    return data['restaurant_owners'] ?? data ?? [];
+  }
+
+  Future<List<dynamic>> getCustomers() async {
+    final data = await get('/admin/customers');
+    return data['customers'] ?? data ?? [];
+  }
+
+  Future<void> updateMenuPrice(String menuId, double price) async {
+    final response = await put('/admin/menu/$menuId/price', {'price': price});
+    if (response != null && response['success'] != true) {
+      throw Exception('Failed to update menu price: ${response['message'] ?? 'Unknown error'}');
+    }
+  }
+
+  Future<void> updateGroceryItemPrice(String groceryId, double price) async {
+    final response = await put('/admin/grocery/$groceryId/price', {'price': price});
+    if (response != null && response['success'] != true) {
+      throw Exception('Failed to update grocery price: ${response['message'] ?? 'Unknown error'}');
+    }
+  }
+
+  Future<void> sendEmail(String subject, String message, String recipient) async {
+    final response = await post('/admin/send-email', {
+      'subject': subject,
+      'message': message,
+      'recipient': recipient,
+    });
+    if (response != null && response['success'] != true) {
+      throw Exception('Failed to send email: ${response['message'] ?? 'Unknown error'}');
+    }
+  }
+
+  // Remaining methods (unchanged for brevity)
   // Restaurant Methods
   Future<List<Map<String, dynamic>>> getRestaurantsFromOverpass({
     double south = 4.0,
@@ -233,26 +287,41 @@ class ApiService {
     return await post('/restaurants', body);
   }
 
-Future<List<dynamic>> getFilteredGroceries(String name, String location) async {
-  final queryParams = <String, String>{};
-  if (name.isNotEmpty) queryParams['name'] = name;
-  if (location.isNotEmpty) queryParams['location'] = location;
+  Future<List<dynamic>> getFilteredGroceries(String name, String location) async {
+    final queryParams = <String, String>{};
+    if (name.isNotEmpty) queryParams['name'] = name;
+    if (location.isNotEmpty) queryParams['location'] = location;
 
-  final uri = Uri.parse('$baseUrl/grocery/filter').replace(queryParameters: queryParams);
-  final data = await get('/grocery/filter?${uri.query}');
-  debugPrint('Raw response from /grocery/filter: $data');
+    final uri = Uri.parse('$baseUrl/grocery/filter').replace(queryParameters: queryParams);
+    final data = await get('/grocery/filter?${uri.query}');
+    if (kDebugMode) debugPrint('Raw response from /grocery/filter: $data');
 
-  if (data is List) return data;
-  if (data is Map) return data['groceries'] ?? data['data'] ?? [];
-  debugPrint('Unexpected response type: ${data.runtimeType}, returning empty list');
-  return [];
-}
+    if (data is List) return data;
+    if (data is Map) return data['groceries'] ?? data['data'] ?? [];
+    if (kDebugMode) debugPrint('Unexpected response type: ${data.runtimeType}, returning empty list');
+    return [];
+  }
+
   Future<List<dynamic>> getRestaurantsFromApi() async {
     final data = await get('/restaurants');
     return data is List ? data : data['restaurants'] ?? data['data'] ?? [];
   }
 
-  // Restaurant Owner Data Method
+  Future<List<dynamic>> getFilteredRestaurants(String name, String location) async {
+    final queryParams = <String, String>{};
+    if (name.isNotEmpty) queryParams['name'] = name;
+    if (location.isNotEmpty) queryParams['location'] = location;
+
+    final uri = Uri.parse('$baseUrl/restaurants/filter').replace(queryParameters: queryParams);
+    final data = await get('/restaurants/filter?${uri.query}');
+    if (kDebugMode) debugPrint('Raw response from /restaurants/filter: $data');
+
+    if (data is List) return data;
+    if (data is Map) return data['restaurants'] ?? data['data'] ?? [];
+    if (kDebugMode) debugPrint('Unexpected response type: ${data.runtimeType}, returning empty list');
+    return [];
+  }
+
   Future<Map<String, dynamic>> getRestaurantOwnerData() async {
     final data = await get('/restaurant-owner/data');
     return data is Map<String, dynamic> ? data : {'restaurants': data ?? []};
@@ -299,20 +368,6 @@ Future<List<dynamic>> getFilteredGroceries(String name, String location) async {
     return await getGroceries();
   }
 
-Future<List<dynamic>> getFilteredRestaurants(String name, String location) async {
-    final queryParams = <String, String>{};
-    if (name.isNotEmpty) queryParams['name'] = name;
-    if (location.isNotEmpty) queryParams['location'] = location;
-
-    final uri = Uri.parse('$baseUrl/restaurants/filter').replace(queryParameters: queryParams);
-    final data = await get('/restaurants/filter?${uri.query}');
-    debugPrint('Raw response from /restaurants/filter: $data');
-
-    if (data is List) return data;
-    if (data is Map) return data['restaurants'] ?? data['data'] ?? [];
-    debugPrint('Unexpected response type: ${data.runtimeType}, returning empty list');
-    return []; // Fallback for unexpected types like String
-  }
   Future<Map<String, dynamic>> createGrocery(List<Map<String, dynamic>> items) async {
     final totalAmount = items.fold(0.0, (sum, item) => sum + (item['quantity'] * item['price']));
     final body = {
@@ -357,6 +412,7 @@ Future<List<dynamic>> getFilteredRestaurants(String name, String location) async
   Future<void> deleteMenuItem(String restaurantId, String menuItemId) async {
     await delete('/restaurants/$restaurantId/menu-items/$menuItemId');
   }
+
   // Review Methods
   Future<List<dynamic>> fetchCustomerReviews() async {
     final data = await get('/customer-reviews');

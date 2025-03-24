@@ -21,7 +21,9 @@ import 'screens/logistics_screen.dart';
 import 'screens/cart_screen.dart';
 import 'screens/grocery_screen.dart';
 import 'screens/dasher_screen.dart';
-import 'screens/customer_review_screen.dart'; // New import
+import 'screens/customer_review_screen.dart';
+import 'screens/admin_login_screen.dart'; 
+import 'screens/admin_screen.dart';// New import for AdminLoginScreen
 
 const primaryColor = Color(0xFFFF7043); // Warm Coral
 const textColor = Color(0xFF3E2723); // Deep Brown
@@ -224,9 +226,17 @@ class _MyAppState extends State<MyApp> {
         '/restaurant-owner': (context) => const RestaurantOwnerScreen(),
         '/cart': (context) => const CartScreen(),
         '/checkout': (context) => const CheckoutScreen(),
-        '/reviews': (context) { // New route for CustomerReviewScreen
+        '/reviews': (context) {
           debugPrint('Navigating to CustomerReviewScreen');
           return const CustomerReviewScreen();
+        },
+        '/admin-login': (context) { // New route for AdminLoginScreen
+          debugPrint('Navigating to AdminLoginScreen');
+          return const AdminLoginScreen();
+        },
+        '/admin': (context) { // Assuming you have an AdminScreen
+          debugPrint('Navigating to AdminScreen');
+          return const AdminScreen();
         },
       },
       onUnknownRoute: (settings) {

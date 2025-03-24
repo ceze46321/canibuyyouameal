@@ -386,10 +386,7 @@ Full policy at chiwexpress.com/privacy.
                                   _buildActionButton(context, 'Order Now', Icons.fastfood, () => Navigator.pushNamed(context, '/restaurants')),
                                   _buildActionButton(context, 'Track Order', Icons.local_shipping, () => Navigator.pushNamed(context, '/orders')),
                                   _buildActionButton(context, 'Groceries', Icons.local_grocery_store, () => Navigator.pushNamed(context, '/groceries')),
-                                  _buildActionButton(context, 'Add Grocery Order', Icons.add_shopping_cart, () {
-                                    print('Navigating to AddGroceryScreen from Home');
-                                    Navigator.push(context, MaterialPageRoute(builder: (_) => const AddGroceryScreen()));
-                                  }),
+                                  
                                   if (auth.isRestaurantOwner)
                                     _buildActionButton(context, 'Create Grocery Product', Icons.add_circle, () {
                                       print('Navigating to CreateGroceryProductScreen from Home');

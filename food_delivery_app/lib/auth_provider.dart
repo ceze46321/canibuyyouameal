@@ -4,7 +4,7 @@ import 'package:chiw_express/models/customer_review.dart';
 import 'package:chiw_express/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
-import 'package:flutter/foundation.dart'; // Add this for debugPrint
+import 'package:flutter/foundation.dart'; // For debugPrint
 import 'dart:html' as html if (dart.library.html) 'dart:html';
 
 class AuthProvider with ChangeNotifier {
@@ -16,6 +16,7 @@ class AuthProvider with ChangeNotifier {
   String? _deliveryLocation;
   String? _phone;
   String? _vehicle;
+  bool _isAdmin = false; // Default to false
   final List<CartItem> _cartItems = [];
   List<Map<String, dynamic>> _groceryProducts = [];
   List<Map<String, dynamic>> _userGroceries = [];
@@ -33,6 +34,7 @@ class AuthProvider with ChangeNotifier {
   String? get phone => _phone;
   String? get vehicle => _vehicle;
   bool get isLoggedIn => _token != null;
+  bool get isAdmin => _isAdmin; // Non-nullable getter
   List<CartItem> get cartItems => _cartItems;
   double get cartTotal => _cartItems.fold(0, (sum, item) => sum + (item.price * item.quantity));
   bool get isRestaurantOwner => _role == 'restaurant_owner';
@@ -57,6 +59,9 @@ class AuthProvider with ChangeNotifier {
       _deliveryLocation = html.window.localStorage['delivery_location'];
       _phone = html.window.localStorage['phone'];
       _vehicle = html.window.localStorage['vehicle'];
+      final adminValue = html.window.localStorage['is_admin'];
+      _isAdmin = _parseAdminStatus(adminValue);
+      debugPrint('Web localStorage is_admin: $adminValue (parsed to $_isAdmin)');
     } else {
       final prefs = await SharedPreferences.getInstance();
       _token = prefs.getString('auth_token');
@@ -66,8 +71,10 @@ class AuthProvider with ChangeNotifier {
       _deliveryLocation = prefs.getString('delivery_location');
       _phone = prefs.getString('phone');
       _vehicle = prefs.getString('vehicle');
+      _isAdmin = prefs.getBool('is_admin') ?? false;
+      debugPrint('SharedPrefs is_admin: ${_isAdmin}');
     }
-    debugPrint('Token loaded: $_token, Role: $_role');
+    debugPrint('Token loaded: $_token, Role: $_role, IsAdmin: $_isAdmin');
     if (_token != null) {
       await _apiService.setToken(_token!);
       await _fetchUserData();
@@ -179,7 +186,7 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Authentication Methods (unchanged)
+  // Authentication Methods
   Future<Map<String, dynamic>> register(String name, String email, String password, String role) async {
     try {
       final response = await _apiService.register(name, email, password, role);
@@ -192,6 +199,8 @@ class AuthProvider with ChangeNotifier {
       _deliveryLocation = response['user']['delivery_location'];
       _phone = response['user']['phone'];
       _vehicle = response['user']['vehicle'];
+      _isAdmin = _parseAdminStatus(response['user']['admin']);
+      debugPrint('Register admin status: ${response['user']['admin']} (parsed to $_isAdmin)');
       await _fetchUserData();
       notifyListeners();
       return response;
@@ -213,6 +222,8 @@ class AuthProvider with ChangeNotifier {
       _deliveryLocation = response['user']['delivery_location'];
       _phone = response['user']['phone'];
       _vehicle = response['user']['vehicle'];
+      _isAdmin = _parseAdminStatus(response['user']['admin']);
+      debugPrint('Login admin status: ${response['user']['admin']} (parsed to $_isAdmin)');
       await _fetchUserData();
       notifyListeners();
       return response;
@@ -234,6 +245,8 @@ class AuthProvider with ChangeNotifier {
       _deliveryLocation = response['user']['delivery_location'];
       _phone = response['user']['phone'];
       _vehicle = response['user']['vehicle'];
+      _isAdmin = _parseAdminStatus(response['user']['admin']);
+      debugPrint('Google login admin status: ${response['user']['admin']} (parsed to $_isAdmin)');
       await _fetchUserData();
       notifyListeners();
       return response;
@@ -243,9 +256,41 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>> adminLogin(String email, String password) async {
+    try {
+      final response = await _apiService.adminLogin(email, password);
+      debugPrint('Admin login response: $response');
+      
+      _token = response['token'];
+      _name = response['user']['name'];
+      _email = response['user']['email'];
+      _role = response['user']['role'];
+      _deliveryLocation = response['user']['delivery_location'];
+      _phone = response['user']['phone'];
+      _vehicle = response['user']['vehicle'];
+      
+      // Set _isAdmin based on response or hardcoded credentials
+      _isAdmin = _parseAdminStatus(response['user']['admin']) || (email == 'admin@canibuyyouameal.com' && password == 'meal123');
+      debugPrint('Set _isAdmin: $_isAdmin for email: $email (from response: ${response['user']['admin']})');
+      
+      await _persistToken(_token!, name: _name, email: _email, role: _role, isAdmin: _isAdmin);
+      await _apiService.setToken(_token!);
+      await _fetchUserData();
+      // Re-enforce _isAdmin after fetch to prevent overwrite
+      _isAdmin = _parseAdminStatus(response['user']['admin']) || (email == 'admin@canibuyyouameal.com' && password == 'meal123');
+      debugPrint('Re-enforced _isAdmin after _fetchUserData: $_isAdmin');
+      
+      notifyListeners();
+      return response;
+    } catch (e) {
+      debugPrint('Admin login failed: $e');
+      rethrow;
+    }
+  }
+
   Future<void> logout() async {
     try {
-      await _apiService.logout();
+      await _apiService.logout(isAdmin: _isAdmin);
       _token = null;
       _name = null;
       _email = null;
@@ -253,27 +298,16 @@ class AuthProvider with ChangeNotifier {
       _deliveryLocation = null;
       _phone = null;
       _vehicle = null;
+      _isAdmin = false;
       _cartItems.clear();
       _groceryProducts.clear();
       _userGroceries.clear();
       _reviews.clear();
       if (_isWeb) {
-        html.window.localStorage.remove('auth_token');
-        html.window.localStorage.remove('name');
-        html.window.localStorage.remove('email');
-        html.window.localStorage.remove('role');
-        html.window.localStorage.remove('delivery_location');
-        html.window.localStorage.remove('phone');
-        html.window.localStorage.remove('vehicle');
+        html.window.localStorage.clear();
       } else {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('auth_token');
-        await prefs.remove('name');
-        await prefs.remove('email');
-        await prefs.remove('role');
-        await prefs.remove('delivery_location');
-        await prefs.remove('phone');
-        await prefs.remove('vehicle');
+        await prefs.clear();
       }
       notifyListeners();
     } catch (e) {
@@ -291,7 +325,9 @@ class AuthProvider with ChangeNotifier {
       _deliveryLocation = response['delivery_location'];
       _phone = response['phone'];
       _vehicle = response['vehicle'];
-      await _persistToken(_token!, name: _name, email: _email, role: _role, deliveryLocation: _deliveryLocation, phone: _phone, vehicle: _vehicle);
+      _isAdmin = _parseAdminStatus(response['admin']);
+      debugPrint('Profile admin status: ${response['admin']} (parsed to $_isAdmin)');
+      await _persistToken(_token!, name: _name, email: _email, role: _role, deliveryLocation: _deliveryLocation, phone: _phone, vehicle: _vehicle, isAdmin: _isAdmin);
       notifyListeners();
       return response;
     } catch (e) {
@@ -316,7 +352,9 @@ class AuthProvider with ChangeNotifier {
       _deliveryLocation = response['user']['delivery_location'];
       _phone = response['user']['phone'];
       _vehicle = response['user']['vehicle'];
-      await _persistToken(_token!, name: _name, email: _email, role: _role, deliveryLocation: _deliveryLocation, phone: _phone, vehicle: _vehicle);
+      _isAdmin = _parseAdminStatus(response['user']['admin']);
+      debugPrint('Update profile admin status: ${response['user']['admin']} (parsed to $_isAdmin)');
+      await _persistToken(_token!, name: _name, email: _email, role: _role, deliveryLocation: _deliveryLocation, phone: _phone, vehicle: _vehicle, isAdmin: _isAdmin);
       notifyListeners();
     } catch (e) {
       debugPrint('Update profile failed: $e');
@@ -338,7 +376,9 @@ class AuthProvider with ChangeNotifier {
       _vehicle = response['user']['vehicle'];
       _role = response['user']['role'];
       _deliveryLocation = response['user']['delivery_location'];
-      await _persistToken(_token!, name: _name, email: _email, role: _role, deliveryLocation: _deliveryLocation, phone: _phone, vehicle: _vehicle);
+      _isAdmin = _parseAdminStatus(response['user']['admin']);
+      debugPrint('Update dasher admin status: ${response['user']['admin']} (parsed to $_isAdmin)');
+      await _persistToken(_token!, name: _name, email: _email, role: _role, deliveryLocation: _deliveryLocation, phone: _phone, vehicle: _vehicle, isAdmin: _isAdmin);
       notifyListeners();
     } catch (e) {
       debugPrint('Update Dasher details failed: $e');
@@ -350,7 +390,9 @@ class AuthProvider with ChangeNotifier {
     try {
       final response = await _apiService.upgradeRole(newRole);
       _role = newRole;
-      await _persistToken(_token!, name: _name, email: _email, role: _role, deliveryLocation: _deliveryLocation, phone: _phone, vehicle: _vehicle);
+      _isAdmin = _parseAdminStatus(response['user']['admin']);
+      debugPrint('Upgrade role admin status: ${response['user']['admin']} (parsed to $_isAdmin)');
+      await _persistToken(_token!, name: _name, email: _email, role: _role, deliveryLocation: _deliveryLocation, phone: _phone, vehicle: _vehicle, isAdmin: _isAdmin);
       notifyListeners();
       return response;
     } catch (e) {
@@ -359,16 +401,102 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-Future<List<dynamic>> getFilteredGroceries(String name, String location) async {
-  try {
-    final response = await _apiService.getFilteredGroceries(name, location);
-    return response; // Already a List<dynamic> from ApiService
-  } catch (e) {
-    debugPrint('Get filtered groceries failed: $e');
-    rethrow;
+  // New Admin Methods
+  Future<List<dynamic>> fetchAllUsers() async {
+    if (!isLoggedIn || !_isAdmin) throw Exception('Admin access required');
+    try {
+      final users = await _apiService.getAllUsers();
+      debugPrint('Fetched all users: $users');
+      return users;
+    } catch (e) {
+      debugPrint('Fetch all users failed: $e');
+      rethrow;
+    }
   }
-}
-  // Grocery Product Management (unchanged)
+
+  Future<List<dynamic>> fetchDashers() async {
+    if (!isLoggedIn || !_isAdmin) throw Exception('Admin access required');
+    try {
+      final dashers = await _apiService.getDashers();
+      debugPrint('Fetched dashers: $dashers');
+      return dashers;
+    } catch (e) {
+      debugPrint('Fetch dashers failed: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<dynamic>> fetchRestaurantOwners() async {
+    if (!isLoggedIn || !_isAdmin) throw Exception('Admin access required');
+    try {
+      final owners = await _apiService.getRestaurantOwners();
+      debugPrint('Fetched restaurant owners: $owners');
+      return owners;
+    } catch (e) {
+      debugPrint('Fetch restaurant owners failed: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<dynamic>> fetchCustomers() async {
+    if (!isLoggedIn || !_isAdmin) throw Exception('Admin access required');
+    try {
+      final customers = await _apiService.getCustomers();
+      debugPrint('Fetched customers: $customers');
+      return customers;
+    } catch (e) {
+      debugPrint('Fetch customers failed: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateMenuPrice(String menuId, double price) async {
+    if (!isLoggedIn || !_isAdmin) throw Exception('Admin access required');
+    try {
+      await _apiService.updateMenuPrice(menuId, price);
+      debugPrint('Menu price updated for menuId: $menuId to $price');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Update menu price failed: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> updateGroceryItemPrice(String groceryId, double price) async {
+    if (!isLoggedIn || !_isAdmin) throw Exception('Admin access required');
+    try {
+      await _apiService.updateGroceryItemPrice(groceryId, price);
+      debugPrint('Grocery price updated for groceryId: $groceryId to $price');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Update grocery price failed: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> sendAdminEmail(String subject, String message, String recipient) async {
+    if (!isLoggedIn || !_isAdmin) throw Exception('Admin access required');
+    try {
+      await _apiService.sendEmail(subject, message, recipient);
+      debugPrint('Email sent to $recipient with subject: $subject');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Send admin email failed: $e');
+      rethrow;
+    }
+  }
+
+  // Existing Grocery Product Management (unchanged)
+  Future<List<dynamic>> getFilteredGroceries(String name, String location) async {
+    try {
+      final response = await _apiService.getFilteredGroceries(name, location);
+      return response;
+    } catch (e) {
+      debugPrint('Get filtered groceries failed: $e');
+      rethrow;
+    }
+  }
+
   Future<List<Map<String, dynamic>>> fetchGroceryProducts() async {
     try {
       final productsData = await _apiService.fetchGroceryProducts();
@@ -451,6 +579,7 @@ Future<List<dynamic>> getFilteredGroceries(String name, String location) async {
       notifyListeners();
     }
   }
+
   Future<Map<String, dynamic>> addRestaurant(
     String name,
     String address,
@@ -481,6 +610,7 @@ Future<List<dynamic>> getFilteredGroceries(String name, String location) async {
       rethrow;
     }
   }
+
   Future<List<dynamic>> getRestaurants() async {
     try {
       return await _apiService.getRestaurantsFromApi();
@@ -490,16 +620,17 @@ Future<List<dynamic>> getFilteredGroceries(String name, String location) async {
     }
   }
 
-Future<List<dynamic>> getFilteredRestaurants(String name, String location) async {
-  try {
-    final response = await _apiService.getFilteredRestaurants(name, location);
-    debugPrint('Filtered restaurants response: $response');
-    return response; // Now guaranteed to be List<dynamic> from ApiService
-  } catch (e) {
-    debugPrint('Get filtered restaurants failed: $e');
-    rethrow;
+  Future<List<dynamic>> getFilteredRestaurants(String name, String location) async {
+    try {
+      final response = await _apiService.getFilteredRestaurants(name, location);
+      debugPrint('Filtered restaurants response: $response');
+      return response;
+    } catch (e) {
+      debugPrint('Get filtered restaurants failed: $e');
+      rethrow;
+    }
   }
-}
+
   Future<List<dynamic>> getRestaurantOrders() async {
     try {
       return await _apiService.getRestaurantOrders();
@@ -597,7 +728,7 @@ Future<List<dynamic>> getFilteredRestaurants(String name, String location) async
     }
   }
 
-  // Fetch Customer Reviews (unchanged)
+  // Fetch Customer Reviews
   Future<void> fetchCustomerReviews() async {
     if (!isLoggedIn) return;
     _isLoadingReviews = true;
@@ -615,7 +746,7 @@ Future<List<dynamic>> getFilteredRestaurants(String name, String location) async
     }
   }
 
-  // Submit Customer Review (unchanged)
+  // Submit Customer Review
   Future<void> submitReview(int rating, String? comment, {int? orderId}) async {
     if (!isLoggedIn) throw Exception('User not authenticated');
     try {
@@ -634,8 +765,8 @@ Future<List<dynamic>> getFilteredRestaurants(String name, String location) async
     }
   }
 
-  // Updated helper method to persist token and all fields
-  Future<void> _persistToken(String token, {String? name, String? email, String? role, String? deliveryLocation, String? phone, String? vehicle}) async {
+  // Helper method to persist token and all fields, including isAdmin
+  Future<void> _persistToken(String token, {String? name, String? email, String? role, String? deliveryLocation, String? phone, String? vehicle, bool? isAdmin}) async {
     if (_isWeb) {
       html.window.localStorage['auth_token'] = token;
       if (name != null) html.window.localStorage['name'] = name;
@@ -644,6 +775,7 @@ Future<List<dynamic>> getFilteredRestaurants(String name, String location) async
       if (deliveryLocation != null) html.window.localStorage['delivery_location'] = deliveryLocation;
       if (phone != null) html.window.localStorage['phone'] = phone;
       if (vehicle != null) html.window.localStorage['vehicle'] = vehicle;
+      if (isAdmin != null) html.window.localStorage['is_admin'] = isAdmin.toString();
     } else {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('auth_token', token);
@@ -653,7 +785,32 @@ Future<List<dynamic>> getFilteredRestaurants(String name, String location) async
       if (deliveryLocation != null) await prefs.setString('delivery_location', deliveryLocation);
       if (phone != null) await prefs.setString('phone', phone);
       if (vehicle != null) await prefs.setString('vehicle', vehicle);
+      if (isAdmin != null) await prefs.setBool('is_admin', isAdmin);
     }
+  }
+
+  bool _parseAdminStatus(dynamic adminValue) {
+    debugPrint('Parsing admin value: "$adminValue" (type: ${adminValue.runtimeType})');
+    if (adminValue == null) {
+      debugPrint('Admin value is null, returning false');
+      return false;
+    }
+    if (adminValue is bool) {
+      debugPrint('Admin value is bool: $adminValue');
+      return adminValue;
+    }
+    if (adminValue is String) {
+      final lowerValue = adminValue.toLowerCase().trim();
+      debugPrint('Admin value is string, lowercased and trimmed: "$lowerValue"');
+      debugPrint('Comparing: "$lowerValue" == "true" (${lowerValue == 'true'}) || "$lowerValue" == "1" (${lowerValue == '1'})');
+      return lowerValue == 'true' || lowerValue == '1';
+    }
+    if (adminValue is int) {
+      debugPrint('Admin value is int: $adminValue');
+      return adminValue == 1;
+    }
+    debugPrint('Unexpected admin value type: $adminValue (${adminValue.runtimeType})');
+    return false;
   }
 
   // Optional: Explicit refresh method
