@@ -25,7 +25,7 @@ class _CreateGroceryProductScreenState extends State<CreateGroceryProductScreen>
   final _imageUrlController = TextEditingController();
   bool _isSubmitting = false;
   List<Map<String, dynamic>> _groceryProducts = [];
-  int _selectedIndex = 2; // Default to Groceries tab (matches GroceryScreen)
+  int _selectedIndex = 2; // Default to Groceries tab
 
   @override
   void initState() {
@@ -52,14 +52,16 @@ class _CreateGroceryProductScreenState extends State<CreateGroceryProductScreen>
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error fetching products: $e', style: GoogleFonts.poppins(color: doorDashWhite)),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error fetching products: $e', style: GoogleFonts.poppins(color: doorDashWhite)),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
     }
   }
 
@@ -73,57 +75,61 @@ class _CreateGroceryProductScreenState extends State<CreateGroceryProductScreen>
     }
 
     if (!authProvider.isRestaurantOwner) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Only restaurant owners can add products', style: GoogleFonts.poppins(color: doorDashWhite)),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Only restaurant owners can add products', style: GoogleFonts.poppins(color: doorDashWhite)),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
       return;
     }
 
     setState(() => _isSubmitting = true);
 
     try {
-      final payload = {
-        'items': [
-          {
-            'name': _nameController.text.trim(),
-            'price': double.parse(_priceController.text.trim()),
-            'quantity': int.parse(_quantityController.text.trim()),
-            'image': _imageUrlController.text.trim().isEmpty ? null : _imageUrlController.text.trim(),
-          }
-        ],
-      };
-      print('Submitting payload: $payload');
-      await authProvider.createGrocery(payload['items'] as List<Map<String, dynamic>>);
+      final payload = [
+        {
+          'name': _nameController.text.trim(),
+          'price': double.parse(_priceController.text.trim()),
+          'quantity': int.parse(_quantityController.text.trim()),
+          'image': _imageUrlController.text.trim().isEmpty ? null : _imageUrlController.text.trim(),
+        }
+      ];
+      debugPrint('Submitting payload: $payload');
+      await authProvider.createGrocery(payload);
       await _fetchGroceryProducts(); // Refresh list after adding
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Product added successfully', style: GoogleFonts.poppins(color: doorDashWhite)),
-          backgroundColor: doorDashRed,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Product added successfully', style: GoogleFonts.poppins(color: doorDashWhite)),
+            backgroundColor: doorDashRed,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
       _nameController.clear();
       _priceController.clear();
       _quantityController.clear();
       _imageUrlController.clear();
     } catch (e) {
-      print('Error: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e', style: GoogleFonts.poppins(color: doorDashWhite)),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      debugPrint('Error adding product: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error adding product: $e', style: GoogleFonts.poppins(color: doorDashWhite)),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
     } finally {
-      setState(() => _isSubmitting = false);
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
@@ -157,23 +163,27 @@ class _CreateGroceryProductScreenState extends State<CreateGroceryProductScreen>
     try {
       await authProvider.deleteGroceryProduct(productId);
       await _fetchGroceryProducts(); // Refresh list after deletion
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Product deleted successfully', style: GoogleFonts.poppins(color: doorDashWhite)),
-          backgroundColor: doorDashRed,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Product deleted successfully', style: GoogleFonts.poppins(color: doorDashWhite)),
+            backgroundColor: doorDashRed,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error deleting product: $e', style: GoogleFonts.poppins(color: doorDashWhite)),
-          backgroundColor: Colors.redAccent,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting product: $e', style: GoogleFonts.poppins(color: doorDashWhite)),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
     }
   }
 
@@ -187,7 +197,7 @@ class _CreateGroceryProductScreenState extends State<CreateGroceryProductScreen>
       4: '/profile',
       5: '/restaurant-owner',
     };
-    if (index != 2 && routes.containsKey(index)) { // 2 is Groceries, so stay if selected
+    if (index != 2 && routes.containsKey(index)) { // 2 is Groceries
       if (index == 1) {
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RestaurantScreen()));
       } else {
@@ -275,9 +285,11 @@ class _CreateGroceryProductScreenState extends State<CreateGroceryProductScreen>
                 _buildSectionTitle('Your Products'),
                 const SizedBox(height: 16),
                 _groceryProducts.isEmpty
-                    ? Text(
-                        'No products yet',
-                        style: GoogleFonts.poppins(fontSize: 16, color: doorDashGrey),
+                    ? Center(
+                        child: Text(
+                          'No products yet',
+                          style: GoogleFonts.poppins(fontSize: 16, color: doorDashGrey),
+                        ),
                       )
                     : ListView.builder(
                         shrinkWrap: true,

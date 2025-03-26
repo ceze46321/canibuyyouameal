@@ -3,8 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
-import 'dart:html' as html; // Web-specific functionality
-import 'package:flutter_stripe/flutter_stripe.dart' as stripe if (dart.library.io) 'package:flutter_stripe/flutter_stripe.dart'; // Alias for Stripe
+import 'package:flutter_stripe/flutter_stripe.dart' as stripe; // Alias for Stripe, mobile-only
 import '../auth_provider.dart';
 import '../models/cart.dart';
 import '../main.dart' show textColor;
@@ -19,10 +18,9 @@ class CheckoutScreen extends StatefulWidget {
 }
 
 class _CheckoutScreenState extends State<CheckoutScreen> {
-  String _paymentMethod = 'flutterwave'; // Default to Flutterwave for web safety
+  String _paymentMethod = 'stripe'; // Default to Stripe for mobile
   bool _isLoading = false;
   int _selectedIndex = 3; // Orders tab as default for Checkout
-  static const bool _isWeb = identical(0, 0.0); // True on web, false on native
 
   static const Color doorDashRed = Color(0xFFEF2A39);
   static const Color doorDashGrey = Color(0xFF757575);
@@ -31,9 +29,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
-    if (!_isWeb) {
-      stripe.Stripe.publishableKey = 'pk_test_51R3VqwFo5xO98pwdjgCiM3rXeI9My0RcZHHEZPJXipbsjZ80ydOnprPsBQZQ9GEmY6aTARgWb7tWxofFLTGqINfq00seIuXSDB'; // Use alias
-    }
+    stripe.Stripe.publishableKey = 'pk_test_51R3VqwFo5xO98pwdjgCiM3rXeI9My0RcZHHEZPJXipbsjZ80ydOnprPsBQZQ9GEmY6aTARgWb7tWxofFLTGqINfq00seIuXSDB';
   }
 
   Future<void> _handleCheckout(AuthProvider auth) async {
@@ -46,9 +42,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       if (orderId == null) throw Exception('Order ID not returned');
 
       if (_paymentMethod == 'stripe') {
-        if (_isWeb) {
-          throw Exception('Stripe payments are not supported on web. Use Flutterwave.');
-        }
         final clientSecret = response['client_secret'] as String?;
         if (clientSecret == null) throw Exception('Stripe client secret not returned');
 
@@ -69,19 +62,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         if (await canLaunchUrl(Uri.parse(paymentLink))) {
           await launchUrl(Uri.parse(paymentLink), mode: LaunchMode.externalApplication);
           _showFlutterwavePendingMessage(orderId);
-
-          if (_isWeb) {
-            html.window.onMessage.listen((event) {
-              if (event.data['type'] == 'payment_complete' && event.data['orderId'] == orderId) {
-                final status = event.data['status'] ?? 'completed';
-                Navigator.pushReplacementNamed(
-                  context,
-                  '/orders',
-                  arguments: {'orderId': orderId, 'status': status},
-                );
-              }
-            });
-          }
 
           final status = await auth.pollOrderStatus(orderId);
           if (status != null) {
@@ -125,7 +105,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Complete payment in browser, then click Return or wait.', style: GoogleFonts.poppins(color: Colors.white)),
+          content: Text('Complete payment in browser, then return to the app.', style: GoogleFonts.poppins(color: Colors.white)),
           backgroundColor: doorDashRed,
           duration: const Duration(seconds: 10),
           action: SnackBarAction(
@@ -271,7 +251,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       ),
                     ),
                     isExpanded: true,
-                    items: (_isWeb ? ['flutterwave'] : ['stripe', 'flutterwave'])
+                    items: ['stripe', 'flutterwave']
                         .map((method) => DropdownMenuItem(
                               value: method,
                               child: Text(method.capitalize(), style: GoogleFonts.poppins(color: textColor)),
@@ -281,14 +261,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       if (value != null) setState(() => _paymentMethod = value);
                     },
                   ).animate().fadeIn(duration: 300.ms),
-                  if (_isWeb)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Text(
-                        'Stripe is only available on mobile.',
-                        style: GoogleFonts.poppins(fontSize: 12, color: Colors.redAccent),
-                      ),
-                    ),
                   const SizedBox(height: 32),
                   ElevatedButton(
                     onPressed: () => _handleCheckout(auth),

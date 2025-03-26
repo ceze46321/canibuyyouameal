@@ -4,10 +4,8 @@ import 'package:provider/provider.dart';
 import '../auth_provider.dart';
 import '../main.dart' show textColor, accentColor;
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'add_grocery_screen.dart';
 import 'create_grocery_product_screen.dart';
-import 'customer_review_screen.dart'; // Added import for CustomerReviewScreen
+// Added import for CustomerReviewScreen
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

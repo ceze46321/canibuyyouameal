@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
-import 'package:uni_links/uni_links.dart'; // For deep linking
+import 'package:app_links/app_links.dart';
 import 'dart:async';
 import 'auth_provider.dart';
 import 'screens/checkout_screen.dart';
@@ -22,8 +22,8 @@ import 'screens/cart_screen.dart';
 import 'screens/grocery_screen.dart';
 import 'screens/dasher_screen.dart';
 import 'screens/customer_review_screen.dart';
-import 'screens/admin_login_screen.dart'; 
-import 'screens/admin_screen.dart';// New import for AdminLoginScreen
+import 'screens/admin_login_screen.dart';
+import 'screens/admin_screen.dart'; // New import for AdminScreen
 
 const primaryColor = Color(0xFFFF7043); // Warm Coral
 const textColor = Color(0xFF3E2723); // Deep Brown
@@ -63,11 +63,12 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   StreamSubscription? _sub;
+  final _appLinks = AppLinks();
 
   @override
   void initState() {
     super.initState();
-    initUniLinks();
+    _initDeepLinks();
   }
 
   @override
@@ -76,14 +77,17 @@ class _MyAppState extends State<MyApp> {
     super.dispose();
   }
 
-  Future<void> initUniLinks() async {
+  Future<void> _initDeepLinks() async {
     try {
-      final initialLink = await getInitialLink();
-      if (initialLink != null) {
+      // Get initial deep link
+      final initialLink = await _appLinks.getInitialLinkString();
+      if (initialLink != null && mounted) {
         _handleDeepLink(initialLink);
       }
-      _sub = linkStream.listen((String? link) {
-        if (link != null) {
+
+      // Listen for incoming deep links
+      _sub = _appLinks.stringLinkStream.listen((String? link) {
+        if (link != null && mounted) {
           _handleDeepLink(link);
         }
       }, onError: (err) {
@@ -230,11 +234,11 @@ class _MyAppState extends State<MyApp> {
           debugPrint('Navigating to CustomerReviewScreen');
           return const CustomerReviewScreen();
         },
-        '/admin-login': (context) { // New route for AdminLoginScreen
+        '/admin-login': (context) {
           debugPrint('Navigating to AdminLoginScreen');
           return const AdminLoginScreen();
         },
-        '/admin': (context) { // Assuming you have an AdminScreen
+        '/admin': (context) {
           debugPrint('Navigating to AdminScreen');
           return const AdminScreen();
         },

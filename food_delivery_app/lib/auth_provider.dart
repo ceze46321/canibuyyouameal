@@ -3,9 +3,7 @@ import 'package:chiw_express/models/cart.dart';
 import 'package:chiw_express/models/customer_review.dart';
 import 'package:chiw_express/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import 'package:flutter/foundation.dart'; // For debugPrint
-import 'dart:html' as html if (dart.library.html) 'dart:html';
 
 class AuthProvider with ChangeNotifier {
   final ApiService _apiService = ApiService();
@@ -23,7 +21,6 @@ class AuthProvider with ChangeNotifier {
   bool _isLoadingGroceries = false;
   List<CustomerReview> _reviews = [];
   bool _isLoadingReviews = false;
-  static const bool _isWeb = identical(0, 0.0);
 
   // Getters
   String? get token => _token;
@@ -51,30 +48,16 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> loadToken() async {
     debugPrint('Loading token...');
-    if (_isWeb) {
-      _token = html.window.localStorage['auth_token'];
-      _name = html.window.localStorage['name'];
-      _email = html.window.localStorage['email'];
-      _role = html.window.localStorage['role'];
-      _deliveryLocation = html.window.localStorage['delivery_location'];
-      _phone = html.window.localStorage['phone'];
-      _vehicle = html.window.localStorage['vehicle'];
-      final adminValue = html.window.localStorage['is_admin'];
-      _isAdmin = _parseAdminStatus(adminValue);
-      debugPrint('Web localStorage is_admin: $adminValue (parsed to $_isAdmin)');
-    } else {
-      final prefs = await SharedPreferences.getInstance();
-      _token = prefs.getString('auth_token');
-      _name = prefs.getString('name');
-      _email = prefs.getString('email');
-      _role = prefs.getString('role');
-      _deliveryLocation = prefs.getString('delivery_location');
-      _phone = prefs.getString('phone');
-      _vehicle = prefs.getString('vehicle');
-      _isAdmin = prefs.getBool('is_admin') ?? false;
-      debugPrint('SharedPrefs is_admin: ${_isAdmin}');
-    }
-    debugPrint('Token loaded: $_token, Role: $_role, IsAdmin: $_isAdmin');
+    final prefs = await SharedPreferences.getInstance();
+    _token = prefs.getString('auth_token');
+    _name = prefs.getString('name');
+    _email = prefs.getString('email');
+    _role = prefs.getString('role');
+    _deliveryLocation = prefs.getString('delivery_location');
+    _phone = prefs.getString('phone');
+    _vehicle = prefs.getString('vehicle');
+    _isAdmin = prefs.getBool('is_admin') ?? false;
+    debugPrint('SharedPrefs loaded - Token: $_token, Role: $_role, IsAdmin: $_isAdmin');
     if (_token != null) {
       await _apiService.setToken(_token!);
       await _fetchUserData();
@@ -269,14 +252,12 @@ class AuthProvider with ChangeNotifier {
       _phone = response['user']['phone'];
       _vehicle = response['user']['vehicle'];
       
-      // Set _isAdmin based on response or hardcoded credentials
       _isAdmin = _parseAdminStatus(response['user']['admin']) || (email == 'admin@canibuyyouameal.com' && password == 'meal123');
       debugPrint('Set _isAdmin: $_isAdmin for email: $email (from response: ${response['user']['admin']})');
       
       await _persistToken(_token!, name: _name, email: _email, role: _role, isAdmin: _isAdmin);
       await _apiService.setToken(_token!);
       await _fetchUserData();
-      // Re-enforce _isAdmin after fetch to prevent overwrite
       _isAdmin = _parseAdminStatus(response['user']['admin']) || (email == 'admin@canibuyyouameal.com' && password == 'meal123');
       debugPrint('Re-enforced _isAdmin after _fetchUserData: $_isAdmin');
       
@@ -303,12 +284,8 @@ class AuthProvider with ChangeNotifier {
       _groceryProducts.clear();
       _userGroceries.clear();
       _reviews.clear();
-      if (_isWeb) {
-        html.window.localStorage.clear();
-      } else {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.clear();
-      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
       notifyListeners();
     } catch (e) {
       debugPrint('Logout failed: $e');
@@ -462,7 +439,7 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<void> updateGroceryItemPrice(String groceryId, double price) async {
+  Future<void> updateGroceryItemPrice(String groceryId, double price, {int itemIndex = 0}) async {
     if (!isLoggedIn || !_isAdmin) throw Exception('Admin access required');
     try {
       await _apiService.updateGroceryItemPrice(groceryId, price);
@@ -474,11 +451,11 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<void> sendAdminEmail(String subject, String message, String recipient) async {
+  Future<void> sendAdminEmail(String subject, String message, String userId) async {
     if (!isLoggedIn || !_isAdmin) throw Exception('Admin access required');
     try {
-      await _apiService.sendEmail(subject, message, recipient);
-      debugPrint('Email sent to $recipient with subject: $subject');
+      await _apiService.sendEmail(subject, message, userId);
+      debugPrint('Email sent to user ID: $userId with subject: $subject');
       notifyListeners();
     } catch (e) {
       debugPrint('Send admin email failed: $e');
@@ -767,26 +744,15 @@ class AuthProvider with ChangeNotifier {
 
   // Helper method to persist token and all fields, including isAdmin
   Future<void> _persistToken(String token, {String? name, String? email, String? role, String? deliveryLocation, String? phone, String? vehicle, bool? isAdmin}) async {
-    if (_isWeb) {
-      html.window.localStorage['auth_token'] = token;
-      if (name != null) html.window.localStorage['name'] = name;
-      if (email != null) html.window.localStorage['email'] = email;
-      if (role != null) html.window.localStorage['role'] = role;
-      if (deliveryLocation != null) html.window.localStorage['delivery_location'] = deliveryLocation;
-      if (phone != null) html.window.localStorage['phone'] = phone;
-      if (vehicle != null) html.window.localStorage['vehicle'] = vehicle;
-      if (isAdmin != null) html.window.localStorage['is_admin'] = isAdmin.toString();
-    } else {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('auth_token', token);
-      if (name != null) await prefs.setString('name', name);
-      if (email != null) await prefs.setString('email', email);
-      if (role != null) await prefs.setString('role', role);
-      if (deliveryLocation != null) await prefs.setString('delivery_location', deliveryLocation);
-      if (phone != null) await prefs.setString('phone', phone);
-      if (vehicle != null) await prefs.setString('vehicle', vehicle);
-      if (isAdmin != null) await prefs.setBool('is_admin', isAdmin);
-    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_token', token);
+    if (name != null) await prefs.setString('name', name);
+    if (email != null) await prefs.setString('email', email);
+    if (role != null) await prefs.setString('role', role);
+    if (deliveryLocation != null) await prefs.setString('delivery_location', deliveryLocation);
+    if (phone != null) await prefs.setString('phone', phone);
+    if (vehicle != null) await prefs.setString('vehicle', vehicle);
+    if (isAdmin != null) await prefs.setBool('is_admin', isAdmin);
   }
 
   bool _parseAdminStatus(dynamic adminValue) {

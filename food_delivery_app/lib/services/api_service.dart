@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:geocoding/geocoding.dart';
 import 'package:flutter/foundation.dart'; // For debugPrint
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:html' as html if (dart.library.html) 'dart:html';
 
 class ApiService {
   static const String baseUrl = 'https://plus.apexjets.org/api';
@@ -12,7 +11,6 @@ class ApiService {
   static const String googlePlacesUrl = 'https://maps.googleapis.com/maps/api/place';
   static String get googleApiKey => dotenv.env['GOOGLE_API_KEY'] ?? 'YOUR_GOOGLE_API_KEY';
   String? _token;
-  static const bool _isWeb = identical(0, 0.0);
 
   // Singleton pattern
   static final ApiService _instance = ApiService._internal();
@@ -31,36 +29,24 @@ class ApiService {
 
   // Load token from persistent storage
   Future<void> loadToken() async {
-    if (_isWeb) {
-      _token = html.window.localStorage['auth_token'];
-    } else {
-      final prefs = await SharedPreferences.getInstance();
-      _token = prefs.getString('auth_token');
-    }
+    final prefs = await SharedPreferences.getInstance();
+    _token = prefs.getString('auth_token');
     if (kDebugMode) print('Token loaded: $_token');
   }
 
   // Set token and persist it
   Future<void> setToken(String token) async {
     _token = token;
-    if (_isWeb) {
-      html.window.localStorage['auth_token'] = token;
-    } else {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('auth_token', token);
-    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_token', token);
     if (kDebugMode) print('Token set: $_token');
   }
 
   // Clear token
   Future<void> clearToken() async {
     _token = null;
-    if (_isWeb) {
-      html.window.localStorage.remove('auth_token');
-    } else {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('auth_token');
-    }
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
     if (kDebugMode) print('Token cleared');
   }
 
@@ -108,7 +94,7 @@ class ApiService {
     throw Exception('$action failed: ${response.statusCode} - ${response.body}');
   }
 
-  // Authentication Methods (unchanged)
+  // Authentication Methods
   Future<Map<String, dynamic>> register(String name, String email, String password, String role) async {
     return await post('/register', {'name': name, 'email': email, 'password': password, 'role': role});
   }
@@ -164,10 +150,10 @@ class ApiService {
     return await post('/upgrade-role', {'role': newRole});
   }
 
-  // Updated Admin Methods (aligned with Laravel routes)
+  // Admin Methods
   Future<List<dynamic>> getAllUsers() async {
     final data = await get('/admin/users');
-    return data['users'] ?? data ?? []; // Fallback to raw data if 'users' key is missing
+    return data['users'] ?? data ?? [];
   }
 
   Future<List<dynamic>> getDashers() async {
@@ -192,8 +178,11 @@ class ApiService {
     }
   }
 
-  Future<void> updateGroceryItemPrice(String groceryId, double price) async {
-    final response = await put('/admin/grocery/$groceryId/price', {'price': price});
+  Future<void> updateGroceryItemPrice(String groceryId, double price, {int itemIndex = 0}) async {
+    final response = await put('/admin/grocery/$groceryId/price', {
+      'price': price,
+      'item_index': itemIndex,
+    });
     if (response != null && response['success'] != true) {
       throw Exception('Failed to update grocery price: ${response['message'] ?? 'Unknown error'}');
     }
@@ -210,7 +199,6 @@ class ApiService {
     }
   }
 
-  // Remaining methods (unchanged for brevity)
   // Restaurant Methods
   Future<List<Map<String, dynamic>>> getRestaurantsFromOverpass({
     double south = 4.0,

@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_stripe/flutter_stripe.dart' as stripe;
-import 'package:uni_links/uni_links.dart';
+import 'package:app_links/app_links.dart';
 import '../main.dart' show primaryColor, textColor, accentColor;
 import '../auth_provider.dart';
 import 'restaurant_screen.dart';
@@ -27,6 +27,7 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
   List<Map<String, dynamic>> _filteredGroceries = [];
   StreamSubscription? _sub;
   bool _isLoading = true;
+  final _appLinks = AppLinks();
 
   static const Color doorDashRed = Color(0xFFEF2A39);
   static const Color doorDashGrey = Color(0xFF757575);
@@ -41,7 +42,7 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
       duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
     _fetchGroceries();
-    _initDeepLinkListener(); // Define this method below
+    _initDeepLinkListener();
     _searchController.addListener(_onFilterChanged);
     _locationController.addListener(_onFilterChanged);
   }
@@ -58,40 +59,44 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching groceries: $e'), backgroundColor: Colors.redAccent),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error fetching groceries: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _initDeepLinkListener() async {
     // Handle initial deep link
-    final initialLink = await getInitialLink();
-    if (initialLink != null) {
+    final initialLink = await _appLinks.getInitialLinkString();
+    if (initialLink != null && mounted) {
       debugPrint('Initial deep link: $initialLink');
       _handleDeepLink(initialLink);
     }
 
     // Listen for deep links during runtime
-    _sub = linkStream.listen((String? link) {
-      if (link != null) {
+    _sub = _appLinks.stringLinkStream.listen((String? link) {
+      if (link != null && mounted) {
         debugPrint('Received deep link: $link');
         _handleDeepLink(link);
       }
     }, onError: (err) {
       debugPrint('Deep link error: $err');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Deep link error: $err'), backgroundColor: Colors.redAccent),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Deep link error: $err'), backgroundColor: Colors.redAccent),
+        );
+      }
     });
   }
 
   void _handleDeepLink(String link) {
     final uri = Uri.parse(link);
     final status = uri.queryParameters['status'];
-    if (status == 'completed') {
+    if (status == 'completed' && mounted) {
       setState(() => cart.clear());
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Payment successful!'), backgroundColor: doorDashRed),
@@ -289,25 +294,31 @@ class _GroceryScreenState extends State<GroceryScreen> with SingleTickerProvider
           ),
         );
         await stripe.Stripe.instance.presentPaymentSheet();
-        setState(() => cart.clear());
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Payment successful!'), backgroundColor: doorDashRed),
-        );
+        if (mounted) {
+          setState(() => cart.clear());
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Payment successful!'), backgroundColor: doorDashRed),
+          );
+        }
       } else if (paymentMethod == 'flutterwave') {
         final paymentLink = response['payment_link'];
         if (await canLaunchUrl(Uri.parse(paymentLink))) {
           await launchUrl(Uri.parse(paymentLink), mode: LaunchMode.externalApplication);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Payment initiated! Complete in browser.'), backgroundColor: doorDashRed),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Payment initiated! Complete in browser.'), backgroundColor: doorDashRed),
+            );
+          }
         } else {
           throw 'Could not launch $paymentLink';
         }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Checkout error: $e'), backgroundColor: Colors.redAccent),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Checkout error: $e'), backgroundColor: Colors.redAccent),
+        );
+      }
     }
   }
 
