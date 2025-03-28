@@ -4,33 +4,33 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'  # Keep for Dart 3.7.2
+  sdk: '>=3.0.0 <4.0.0'  # Compatible with Dart 3.2.0 (Flutter 3.16.0)
 
 dependencies:
   flutter:
     sdk: flutter
   provider: ^6.1.2
-  http: ^1.2.1
-  google_fonts: ^6.2.1
+  http: ^1.2.0
+  google_fonts: ^6.1.0
   flutter_spinkit: ^5.2.1
   geocoding: ^3.0.0
-  google_sign_in: ^6.2.1
+  google_sign_in: ^6.1.6
   flutter_dotenv: ^5.1.0
-  url_launcher: ^6.2.4      # Already present, keep it
-  webview_flutter: ^4.7.0
+  url_launcher: ^6.2.4
+  webview_flutter: ^4.4.4
   flutter_secure_storage: ^9.0.0
-  flutter_stripe: ^11.0.0   # For Stripe payments
-  app_links: ^6.2.1
+  flutter_stripe: ^10.1.1
+  app_links: ^6.1.1
   flutter_staggered_grid_view: ^0.7.0
-  flutter_animate: ^4.5.2
+  flutter_animate: ^4.5.0
   shared_preferences: ^2.2.3
   carousel_slider: ^4.2.1
   cached_network_image: ^3.3.1
-  # Removed flutterwave_standard
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
+  flutter_lints: ^3.0.1  # Set to a version compatible with Dart 3.2.0
 
 flutter:
   uses-material-design: true
