@@ -17,8 +17,8 @@ val keystoreProperties = Properties().apply {
 android {
     namespace = "com.example.chiw_express"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
     ndkVersion = "27.0.12077973"
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -48,12 +48,8 @@ android {
     buildTypes {
         getByName("release") {
             signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = false  // Disable minification if not needed
+            isShrinkResources = false  // Disable resource shrinking
         }
     }
-}
-
-flutter {
-    source = "../.."
 }
